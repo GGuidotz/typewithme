@@ -3,6 +3,20 @@
 Formato: `## <versione> · <data>`, poi `### Novità`, `### Miglioramenti`, `### Correzioni`, una riga `- ` per
 cambiamento. L'app mostra la sezione della sua versione in Impostazioni › Aggiornamenti (Sources/App/Changelog.swift).
 
+## 0.5.0 · 2026-11-07
+
+Gemma dentro l'app, una tastiera che non aspetta mai e Mail.
+
+### Novità
+- **Gemma dentro l'app.** Con un modello base già sul Mac (come quello di Cotypist) Gemma gira dentro Type_w/Me, senza server né richieste HTTP: il primo pezzo del seguito arriva in 15-50 millisecondi invece di 90-120, e se scrivi proprio quello che il modello aveva previsto il seguito dopo è già pronto. Senza le librerie di llama.cpp, o con un modello istruito, resta llama-server.
+
+### Miglioramenti
+- **Tastiera sempre pronta.** Il tap che intercetta Tab ed Esc gira su un thread suo e decide senza aspettare il resto dell'app: prima ogni tasto, in ogni app, attendeva il thread principale di Type_w/Me, e una lettura Accessibilità lenta poteva bloccare la tastiera di tutto il Mac. Le domande Accessibilità aspettano al massimo mezzo secondo.
+- **La pausa segue il tuo ritmo.** Un seguito si chiede dopo poco più di metà del tuo intervallo tipico tra due tasti (tra 60 e 250 ms), mai prima della pausa scelta: non a metà di una raffica di tasti, ma subito quando ti fermi.
+- **Mail, Safari e le app WebKit.** I campi WebKit non danno le posizioni del testo ma solo dei "segnaposto" (text marker): ora il campo, il testo prima e dopo il cursore e il cursore si leggono anche così, e il suggerimento compare dove prima il campo non si trovava. Se il campo non si trova ancora, la diagnostica dice che cosa espone (ruolo e attributi, mai testo).
+- **Il contesto dallo schermo arriva davvero.** Quando l'Accessibilità dava solo un pezzetto della finestra, il contesto restava fermo 45 secondi con quel pezzetto e il testo riconosciuto sullo schermo, che arriva un attimo dopo, non entrava mai nel prompt. Ora entra alla richiesta successiva, e per i modelli base il contesto davanti al testo passa da 500 a 800 caratteri.
+- **Meno memoria sui Mac da 8 GB.** Lì "Tieni il modello pronto" parte spento: Gemma si spegne dopo i minuti scelti invece di restare in memoria. Il contesto dallo schermo si rilegge al più ogni 15 secondi nella stessa finestra (subito se cambi finestra).
+
 ## 0.4.0 · 2026-10-29
 
 Suggerimenti più lunghi e sensati con il modello di Cotypist.
@@ -12,11 +26,6 @@ Suggerimenti più lunghi e sensati con il modello di Cotypist.
 - **Contesto come in un documento vero.** Con Gemma base il contesto non è più un'intestazione di istruzioni: in Mail l'oggetto e il messaggio a cui rispondi, citato con "> "; in chat gli ultimi messaggi, una riga ciascuno. Solo righe di testo scritto, niente menu o pulsanti, e resta fermo mentre scrivi nello stesso campo.
 
 ### Miglioramenti
-- **Tastiera sempre pronta.** Il tap che intercetta Tab ed Esc gira su un thread suo e decide senza aspettare il resto dell'app: prima ogni tasto, in ogni app, attendeva il thread principale di Type_w/Me, e una lettura Accessibilità lenta poteva bloccare la tastiera di tutto il Mac. Le domande Accessibilità aspettano al massimo mezzo secondo.
-- **La pausa segue il tuo ritmo.** Un seguito si chiede dopo poco più di metà del tuo intervallo tipico tra due tasti (tra 60 e 250 ms), mai prima della pausa scelta: non a metà di una raffica di tasti, ma subito quando ti fermi.
-- **Mail, Safari e le app WebKit.** I campi WebKit non danno le posizioni del testo ma solo dei "segnaposto" (text marker): ora il campo, il testo prima e dopo il cursore e il cursore si leggono anche così, e il suggerimento compare dove prima il campo non si trovava. Se il campo non si trova ancora, la diagnostica dice che cosa espone (ruolo e attributi, mai testo).
-- **Il contesto dallo schermo arriva davvero.** Quando l'Accessibilità dava solo un pezzetto della finestra, il contesto restava fermo 45 secondi con quel pezzetto e il testo riconosciuto sullo schermo, che arriva un attimo dopo, non entrava mai nel prompt. Ora entra alla richiesta successiva, e per i modelli base il contesto davanti al testo passa da 500 a 800 caratteri.
-- **Meno memoria sui Mac da 8 GB.** Lì "Tieni il modello pronto" parte spento: Gemma si spegne dopo i minuti scelti invece di restare in memoria. Il contesto dallo schermo si rilegge al più ogni 15 secondi nella stessa finestra (subito se cambi finestra).
 - **Lunghezza decisa meglio.** Il suggerimento va avanti finché la probabilità media per token resta alta, invece di moltiplicare le probabilità delle parole: con le parole italiane spezzate in più pezzi ci si fermava quasi sempre alla prima.
 - **Prompt pulito per i modelli base.** Gemma base non riceve più istruzioni in inglese, appunti o testi tuoi interi davanti, che lo confondevano. Il prompt cresce solo in coda e resta nella cache, quindi le risposte sono più rapide.
 - **Niente penalità sulle ripetizioni.** Spingeva il modello lontano da "di", "che", "la" e rendeva il seguito innaturale.

@@ -42,71 +42,6 @@ cp -R Localization/*.lproj "$APP/Contents/Resources/"
 cp CHANGELOG.md "$APP/Contents/Resources/CHANGELOG.md"   # Impostazioni › Aggiornamenti › Novità di questa versione
 [ -f CHANGELOG.en.md ] && cp CHANGELOG.en.md "$APP/Contents/Resources/CHANGELOG.en.md"   # le stesse, in inglese
 
-SOURCES=(Sources/**/*.swift)
-# Apple Intelligence (FoundationModels): collegato "debole", così l'app parte anche su un Mac dove il framework manca
-# (il codice controlla comunque la disponibilità prima di usarlo).
-LINK=()
-SDK=$(xcrun --show-sdk-path 2>/dev/null || true)
-if [ -n "$SDK" ] && [ -d "$SDK/System/Library/Frameworks/FoundationModels.framework" ]; then
-  LINK=(-Xlinker -weak_framework -Xlinker FoundationModels)
-fi
-for arch in arm64 x86_64; do
-  mkdir -p "$BUILD/$arch"
-  swiftc -O -swift-version 5 -parse-as-library -target "$arch-apple-macos26.0" "${SOURCES[@]}" "${LINK[@]}" \
-    -o "$BUILD/$arch/$EXE"
-done
-lipo -create "$BUILD/arm64/$EXE" "$BUILD/x86_64/$EXE" -output "$APP/Contents/MacOS/$EXE"
-
-ICONSET="$BUILD/AppIcon.iconset"
-rm -rf "$ICONSET"; mkdir -p "$ICONSET"
-for s in 16 32 128 256 512; do
-  sips -z $s $s Resources/Icon/AppIcon-1024.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
-  sips -z $((s * 2)) $((s * 2)) Resources/Icon/AppIcon-1024.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
-done
-iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
-
-# Icona Liquid Glass (Resources/Icon/Suggeritore.icon, formato Icon Composer): serve actool di Xcode. Poi
-# tools/icon-check la disegna come il Dock: se risulta vuota, o uguale all'icona generica, si resta sulla classica.
-ICON_TIER=classic
-ICON_CHECK=""
-if [ "${TYPEWITHME_ICON:-${SUGGERITORE_ICON:-}}" != classic ] && [ -d Resources/Icon/Suggeritore.icon ]; then
-  if [ -z "${DEVELOPER_DIR:-}" ] && [ -d /Applications/Xcode.app/Contents/Developer ]; then
-    export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer   # Xcode anche se è selezionato solo CLT
-  fi
-  ACTOOL=$(xcrun --find actool 2>/dev/null || true)
-  if [ -n "$ACTOOL" ]; then
-    rm -rf "$BUILD/icon-out"; mkdir -p "$BUILD/icon-out"
-    if "$ACTOOL" Resources/Icon/Suggeritore.icon --compile "$BUILD/icon-out" --output-format human-readable-text \
-         --notices --warnings --platform macosx --target-device mac --minimum-deployment-target 26.0 \
-         --app-icon Suggeritore --include-all-app-icons --development-region en \
-         --output-partial-info-plist "$BUILD/icon-partial.plist" >"$BUILD/actool.log" 2>&1 \
-       && [ -f "$BUILD/icon-out/Assets.car" ]; then
-      ICON_NAME=$(/usr/bin/plutil -extract CFBundleIconName raw "$BUILD/icon-partial.plist" 2>/dev/null || echo Suggeritore)
-      cp "$BUILD/icon-out/Assets.car" "$APP/Contents/Resources/"
-      plist_set CFBundleIconName "$ICON_NAME"
-      ICON_TIER="liquid-glass"
-      if swiftc -O -swift-version 5 tools/icon-check/main.swift tools/icon-check/IconMetrics.swift -o "$BUILD/icon-check" \
-           >>"$BUILD/actool.log" 2>&1; then
-        ICON_CHECK=$("$BUILD/icon-check" "$APP" "$BUILD/icon-out" "$BUILD" 2>>"$BUILD/actool.log") && rc=0 || rc=$?
-        if [ "$rc" -eq 1 ]; then
-          echo "Icona Liquid Glass vuota ($ICON_CHECK): uso l'icona classica. Anteprime in $BUILD/icon-preview.png."
-          rm -f "$APP/Contents/Resources/Assets.car"
-          /usr/bin/plutil -remove CFBundleIconName "$PLIST"
-          ICON_TIER=classic
-        elif [ "$rc" -ne 0 ]; then
-          ICON_CHECK="controllo non riuscito: $ICON_CHECK"
-        fi
-      else
-        ICON_CHECK="controllo non compilato (dettagli in $BUILD/actool.log)"
-      fi
-    else
-      echo "Icona Liquid Glass non compilata (dettagli in $BUILD/actool.log): uso l'icona classica."
-    fi
-  else
-    echo "actool non trovato (serve Xcode): icona classica."
-  fi
-fi
-
 # llama-server dentro l'app (Contents/Helpers/llama, con le sue librerie): chi installa non ha bisogno di Homebrew.
 # Dalla build di llama.cpp scritta in packaging/llama.cpp-version ("bNNNN"; "latest": l'ultima, risolta adesso), solo per
 # Apple silicon; scaricata una volta in build/llama-cache. Senza rete si continua senza: l'app usa quello di Homebrew.
@@ -164,6 +99,87 @@ if [ "${TYPEWITHME_LLAMA:-}" != none ]; then
   fi
 fi
 
+SOURCES=(Sources/**/*.swift)
+# Apple Intelligence (FoundationModels): collegato "debole", così l'app parte anche su un Mac dove il framework manca
+# (il codice controlla comunque la disponibilità prima di usarlo).
+LINK=()
+SDK=$(xcrun --show-sdk-path 2>/dev/null || true)
+if [ -n "$SDK" ] && [ -d "$SDK/System/Library/Frameworks/FoundationModels.framework" ]; then
+  LINK=(-Xlinker -weak_framework -Xlinker FoundationModels)
+fi
+# Gemma dentro l'app (Sources/App/Engines/LlamaRuntime.swift): solo su Apple silicon, collegato alla libllama inclusa
+# in Contents/Helpers/llama e compilato contro gli header della stessa build (Vendor/llama, tools/update-llama-headers.sh).
+# Senza, resta llama-server.
+INPROCESS=no
+INPROCESS_FLAGS=()
+if [ -n "$LLAMA_TAG" ] && [ -f "${LLAMA_CACHE:-}/libllama.dylib" ] && [ -f Vendor/llama/include/llama.h ]; then
+  if [ "$(tr -d '[:space:]' < Vendor/llama/TAG 2>/dev/null)" = "$LLAMA_TAG" ]; then
+    INPROCESS=yes
+    INPROCESS_FLAGS=(-D TWM_INPROCESS_LLAMA -import-objc-header Vendor/llama/TypeWithMeLlama.h -I Vendor/llama/include
+                     -L "$LLAMA_CACHE" -lllama -Xlinker -rpath -Xlinker @executable_path/../Helpers/llama)
+  else
+    echo "Header di llama.cpp di un'altra build: Gemma solo via llama-server (./tools/update-llama-headers.sh)."
+  fi
+fi
+for arch in arm64 x86_64; do
+  mkdir -p "$BUILD/$arch"
+  EXTRA=()
+  [ "$arch" = arm64 ] && EXTRA=("${INPROCESS_FLAGS[@]}")
+  swiftc -O -swift-version 5 -parse-as-library -target "$arch-apple-macos26.0" "${SOURCES[@]}" "${LINK[@]}" "${EXTRA[@]}" \
+    -o "$BUILD/$arch/$EXE"
+done
+lipo -create "$BUILD/arm64/$EXE" "$BUILD/x86_64/$EXE" -output "$APP/Contents/MacOS/$EXE"
+
+ICONSET="$BUILD/AppIcon.iconset"
+rm -rf "$ICONSET"; mkdir -p "$ICONSET"
+for s in 16 32 128 256 512; do
+  sips -z $s $s Resources/Icon/AppIcon-1024.png --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
+  sips -z $((s * 2)) $((s * 2)) Resources/Icon/AppIcon-1024.png --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+
+# Icona Liquid Glass (Resources/Icon/Suggeritore.icon, formato Icon Composer): serve actool di Xcode. Poi
+# tools/icon-check la disegna come il Dock: se risulta vuota, o uguale all'icona generica, si resta sulla classica.
+ICON_TIER=classic
+ICON_CHECK=""
+if [ "${TYPEWITHME_ICON:-${SUGGERITORE_ICON:-}}" != classic ] && [ -d Resources/Icon/Suggeritore.icon ]; then
+  if [ -z "${DEVELOPER_DIR:-}" ] && [ -d /Applications/Xcode.app/Contents/Developer ]; then
+    export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer   # Xcode anche se è selezionato solo CLT
+  fi
+  ACTOOL=$(xcrun --find actool 2>/dev/null || true)
+  if [ -n "$ACTOOL" ]; then
+    rm -rf "$BUILD/icon-out"; mkdir -p "$BUILD/icon-out"
+    if "$ACTOOL" Resources/Icon/Suggeritore.icon --compile "$BUILD/icon-out" --output-format human-readable-text \
+         --notices --warnings --platform macosx --target-device mac --minimum-deployment-target 26.0 \
+         --app-icon Suggeritore --include-all-app-icons --development-region en \
+         --output-partial-info-plist "$BUILD/icon-partial.plist" >"$BUILD/actool.log" 2>&1 \
+       && [ -f "$BUILD/icon-out/Assets.car" ]; then
+      ICON_NAME=$(/usr/bin/plutil -extract CFBundleIconName raw "$BUILD/icon-partial.plist" 2>/dev/null || echo Suggeritore)
+      cp "$BUILD/icon-out/Assets.car" "$APP/Contents/Resources/"
+      plist_set CFBundleIconName "$ICON_NAME"
+      ICON_TIER="liquid-glass"
+      if swiftc -O -swift-version 5 tools/icon-check/main.swift tools/icon-check/IconMetrics.swift -o "$BUILD/icon-check" \
+           >>"$BUILD/actool.log" 2>&1; then
+        ICON_CHECK=$("$BUILD/icon-check" "$APP" "$BUILD/icon-out" "$BUILD" 2>>"$BUILD/actool.log") && rc=0 || rc=$?
+        if [ "$rc" -eq 1 ]; then
+          echo "Icona Liquid Glass vuota ($ICON_CHECK): uso l'icona classica. Anteprime in $BUILD/icon-preview.png."
+          rm -f "$APP/Contents/Resources/Assets.car"
+          /usr/bin/plutil -remove CFBundleIconName "$PLIST"
+          ICON_TIER=classic
+        elif [ "$rc" -ne 0 ]; then
+          ICON_CHECK="controllo non riuscito: $ICON_CHECK"
+        fi
+      else
+        ICON_CHECK="controllo non compilato (dettagli in $BUILD/actool.log)"
+      fi
+    else
+      echo "Icona Liquid Glass non compilata (dettagli in $BUILD/actool.log): uso l'icona classica."
+    fi
+  else
+    echo "actool non trovato (serve Xcode): icona classica."
+  fi
+fi
+
 # Dati per la diagnostica e per gli aggiornamenti (Sources/App/Diagnostics.swift, Sources/App/Updater.swift).
 plist_set SGRGitCommit "$COMMIT"
 plist_set SGRIconTier "$ICON_TIER"
@@ -192,7 +208,7 @@ else
   echo "Attenzione: firma ad hoc. A ogni build macOS dimentica Accessibilità e Monitoraggio input (vedi make-signing-identity.sh di Nod)."
 fi
 codesign --verify --strict "$APP"
-echo "Pronto: $APP ($VERSION, build $BUILD_NUMBER, commit $COMMIT, firma $SIGNING, icona $ICON_TIER${ICON_CHECK:+: $ICON_CHECK}, llama.cpp ${LLAMA_TAG:-da Homebrew})"
+echo "Pronto: $APP ($VERSION, build $BUILD_NUMBER, commit $COMMIT, firma $SIGNING, icona $ICON_TIER${ICON_CHECK:+: $ICON_CHECK}, llama.cpp ${LLAMA_TAG:-da Homebrew}, Gemma dentro l'app: $INPROCESS)"
 
 case "$MODE" in
   install)

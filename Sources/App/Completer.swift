@@ -551,7 +551,7 @@ final class Completer: ObservableObject {
                                             : context.limited(to: engine.contextLimit)
         // Un modello base continua un documento (Prompting.rawPrompt): il contesto della finestra entra come mail citata
         // o come chat; appunti e testi tuoi interi no, al loro posto il modello personale.
-        let baseModel = (engine as? LlamaEngine)?.rawCompletion == true
+        let baseModel = (engine as? any GemmaEngine)?.rawCompletion == true
         let window = windowContext(field: field, before: limited.before)
         var draft = CompletionRequest(context: limited, length: prefs.length,
                                       language: language, instructions: prefs.instructions,
@@ -588,8 +588,8 @@ final class Completer: ObservableObject {
                 let elapsed = Date().timeIntervalSince(started)
                 self.recordResponseTime(elapsed)
                 self.recordLatency(Latency(readMs: readMs, firstMs: self.firstPieceMs ?? elapsed * 1000, totalMs: elapsed * 1000,
-                                           timings: (engine as? LlamaEngine)?.lastTimings))
-                if let stop = (engine as? LlamaEngine)?.lastStop {
+                                           timings: (engine as? any GemmaEngine)?.lastTimings))
+                if let stop = (engine as? any GemmaEngine)?.lastStop {
                     self.stats.stops[stop.reason, default: 0] += 1
                     self.stats.stoppedAnswers += 1
                     self.stats.stoppedWords += stop.words

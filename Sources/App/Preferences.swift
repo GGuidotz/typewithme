@@ -39,6 +39,13 @@ final class Preferences: ObservableObject {
     @Published var acceptAll: KeyBinding { didSet { save(acceptAll, "acceptAll") } }
     @Published var dismiss: KeyBinding { didSet { save(dismiss, "dismiss") } }
     @Published var rewrite: KeyBinding { didSet { save(rewrite, "rewrite") } }
+    @Published var proofread: KeyBinding { didSet { save(proofread, "proofread") } }
+    @Published var synonyms: KeyBinding { didSet { save(synonyms, "synonyms") } }
+    /// Il correttore (Proofreader.swift): ortografia mentre scrivi, e grammatica con Apple Intelligence se `grammarCheck`.
+    @Published var proofreading: Bool { didSet { defaults.set(proofreading, forKey: "proofreading") } }
+    @Published var grammarCheck: Bool { didSet { defaults.set(grammarCheck, forKey: "grammarCheck") } }
+    /// Le parole che il correttore non segnala più ("Ignora"), in minuscolo.
+    @Published var learnedWords: [String] { didSet { defaults.set(learnedWords, forKey: "learnedWords") } }
     /// Completamento a metà riga (sperimentale).
     @Published var midLine: Bool { didSet { defaults.set(midLine, forKey: "midLine") } }
     @Published var italianCorrections: Bool { didSet { defaults.set(italianCorrections, forKey: "italianCorrections") } }
@@ -123,6 +130,11 @@ final class Preferences: ObservableObject {
         acceptAll = load("acceptAll", KeyBinding.shiftTab)
         dismiss = load("dismiss", KeyBinding.escape)
         rewrite = load("rewrite", KeyBinding.controlOptionR)
+        proofread = load("proofread", KeyBinding.controlOptionG)
+        synonyms = load("synonyms", KeyBinding.controlOptionS)
+        proofreading = d.object(forKey: "proofreading") as? Bool ?? true
+        grammarCheck = d.object(forKey: "grammarCheck") as? Bool ?? true
+        learnedWords = d.stringArray(forKey: "learnedWords") ?? []
         midLine = d.bool(forKey: "midLine")
         italianCorrections = d.object(forKey: "italianCorrections") as? Bool ?? true
         capitalizeSentences = d.object(forKey: "capitalizeSentences") as? Bool ?? true

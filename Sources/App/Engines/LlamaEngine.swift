@@ -130,7 +130,7 @@ final class LlamaEngine: CompletionEngine, @unchecked Sendable {
         urlRequest.httpBody = (try? JSONSerialization.data(withJSONObject: object)) ?? Data()
         let (bytes, response) = try await LocalHTTP.session.bytes(for: urlRequest)
         try Self.check(response)
-        var stop = ConfidenceStop(length: request.length, maxWords: request.maxWords)
+        var stop = ConfidenceStop(length: request.length, maxWords: request.maxWords, strictness: request.strictness)
         if let forced { _ = stop.add(forced.text, logprob: log(Swift.max(forced.score, 0.01)), tokenCount: 1) }
         let markupAllowed = request.context.before.contains("<")
         var natural = false

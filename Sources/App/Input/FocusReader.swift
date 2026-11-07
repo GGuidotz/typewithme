@@ -298,6 +298,18 @@ enum FocusReader {
         return r.minX
     }
 
+    /// Il rettangolo di un pezzo di testo del campo (per sottolineare un errore), coordinate AX. nil se l'app non lo dice
+    /// o il rettangolo non è plausibile.
+    static func rect(for range: CFRange, in field: FocusedField) -> CGRect? {
+        guard field.markerText == nil, range.length > 0,
+              let r = bounds(forRange: range, in: field.element), r.height > 4, r.height < 300, r.width > 0,
+              !(r.minX == 0 && r.minY == 0) else { return nil }
+        if let frame = field.frame, frame.width > 4, !frame.insetBy(dx: -24, dy: -24).contains(CGPoint(x: r.minX, y: r.midY)) {
+            return nil
+        }
+        return r
+    }
+
     /// Il rettangolo della selezione (per il pannello "Riscrivi"), coordinate AX.
     static func selectionBounds(_ field: FocusedField) -> CGRect? {
         guard field.selection.length > 0 else { return caretBounds(field, afterNewline: false) }

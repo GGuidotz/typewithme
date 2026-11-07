@@ -127,10 +127,30 @@ enum Prompting {
                 out += (italian ? "Oggetto: " : "Subject: ") + String(title.prefix(120)) + "\n"
             }
             if !lines.isEmpty { out += (out.isEmpty ? "" : "\n") + lines.map { "> " + $0 }.joined(separator: "\n") }
-        case .chat, .other:
+        case .chat:
             out = lines.joined(separator: "\n")
+        case .other:
+            // Un documento, una pagina, una nota: il titolo della finestra in testa ancora il seguito all'argomento.
+            // Senza i nomi dell'app ("— Safari", "- Microsoft Word") che non fanno parte del documento.
+            if let title = r.windowTitle.map(Self.documentTitle), !title.isEmpty, !lines.contains(title) {
+                out = title + (lines.isEmpty ? "" : "\n\n")
+            }
+            out += lines.joined(separator: "\n")
         }
         return out.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Il titolo della finestra senza il nome dell'app e senza estensioni di file: "Relazione.docx — Word" → "Relazione".
+    static func documentTitle(_ raw: String) -> String {
+        var title = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        for separator in [" — ", " – ", " - ", " | "] {
+            if let range = title.range(of: separator, options: .backwards) { title = String(title[..<range.lowerBound]) }
+        }
+        if let dot = title.range(of: ".", options: .backwards), title.distance(from: dot.upperBound, to: title.endIndex) <= 5,
+           title[dot.upperBound...].allSatisfy(\.isLetter) {
+            title = String(title[..<dot.lowerBound])
+        }
+        return String(title.prefix(120))
     }
 
     /// Le righe che sembrano testo scritto: almeno tre parole, quasi tutte lettere, senza indirizzi web.

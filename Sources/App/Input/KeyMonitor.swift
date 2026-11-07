@@ -37,7 +37,7 @@ struct KeyStroke {
 enum KeyDecision { case pass, swallow }
 
 /// Che cosa ha deciso il tap per un tasto che ha preso per sé (o `.none` se l'ha lasciato passare).
-enum TapAction { case none, rewrite, acceptWord, acceptAll, dismiss, holdAfterAccept }
+enum TapAction { case none, rewrite, proofread, synonyms, acceptWord, acceptAll, dismiss, holdAfterAccept }
 
 /// Quello che il tap deve sapere per decidere sul suo thread. Lo scrive il Completer (thread principale), lo legge e
 /// lo aggiorna il tap; sempre sotto lucchetto.
@@ -49,6 +49,8 @@ struct TapState: Sendable {
     var acceptAll = KeyBinding.shiftTab
     var dismiss = KeyBinding.escape
     var rewrite = KeyBinding.controlOptionR
+    var proofread = KeyBinding.controlOptionG
+    var synonyms = KeyBinding.controlOptionS
     var lastAcceptAt = Date.distantPast
 
     /// Le stesse regole di prima, senza toccare l'Accessibilità né il thread principale. Se il suggerimento sparisce o
@@ -59,6 +61,14 @@ struct TapState: Sendable {
         if rewrite.matches(keyCode: s.keyCode, flags: s.flags) {
             suggestion = nil
             return (.swallow, .rewrite)
+        }
+        if proofread.matches(keyCode: s.keyCode, flags: s.flags) {
+            suggestion = nil
+            return (.swallow, .proofread)
+        }
+        if synonyms.matches(keyCode: s.keyCode, flags: s.flags) {
+            suggestion = nil
+            return (.swallow, .synonyms)
         }
         if secureInput {
             suggestion = nil

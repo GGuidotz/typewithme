@@ -305,7 +305,7 @@ final class LocalGemmaEngine: GemmaEngine, @unchecked Sendable {
         if !request.personal.isEmpty, request.personalWeight > 0 {
             forced = (try? await personalChoice(request, prompt: prompt)) ?? nil
         }
-        let box = StopBox(stop: ConfidenceStop(length: request.length, maxWords: request.maxWords))
+        let box = StopBox(stop: ConfidenceStop(length: request.length, maxWords: request.maxWords, strictness: request.strictness))
         if let forced { _ = box.stop.add(forced.text, logprob: log(Swift.max(forced.score, 0.01)), tokenCount: 1) }
         let markupAllowed = request.context.before.contains("<")
         // Un carattere UTF-8 diviso tra due token arriva con il secondo: il logprob del primo si somma.

@@ -141,9 +141,12 @@ enum DiagnosticsReport {
         row("Enabled", yesNo(prefs.enabled))
         row("Length", "\(prefs.length.rawValue), up to \(prefs.maxWords) words")
         row("Delay", "\(Int(prefs.delay * 1000)) ms")
-        row("Keys", "word \(prefs.acceptWord.display), all \(prefs.acceptAll.display), dismiss \(prefs.dismiss.display), rewrite \(prefs.rewrite.display)")
+        row("Keys", "word \(prefs.acceptWord.display), all \(prefs.acceptAll.display), dismiss \(prefs.dismiss.display), rewrite \(prefs.rewrite.display), proofread \(prefs.proofread.display), synonyms \(prefs.synonyms.display)")
         row("Mid-line", yesNo(prefs.midLine))
         row("Italian corrections", "\(yesNo(prefs.italianCorrections)), capitalize \(yesNo(prefs.capitalizeSentences))")
+        let proof = AppModel.shared.proofreader
+        row("Proofreading", "\(yesNo(prefs.proofreading)), grammar \(yesNo(prefs.grammarCheck)), \(proof.checks) checks, \(proof.grammarChecks) grammar checks" + (proof.lastGrammarMs.map { ", last \($0) ms" } ?? "") + ", \(proof.applied) fixes applied, \(prefs.learnedWords.count) ignored words")
+        row("App adaptation", completer.adaptation.summary.isEmpty ? "learning" : completer.adaptation.summary)
         row("Phrase memory", "\(yesNo(prefs.phraseMemory)), \(completer.memory.count) entries")
         row("Clipboard as context", yesNo(prefs.clipboardContext))
         row("App as context", "\(yesNo(prefs.appContext)), \(completer.windowText.reads) reads, last \(completer.windowText.lastCharacters) characters")

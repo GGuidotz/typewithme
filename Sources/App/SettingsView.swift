@@ -199,6 +199,8 @@ private struct SuggestionSettings: View {
                 KeyBindingRecorder(title: L("Accetta tutto"), binding: $prefs.acceptAll, reset: .shiftTab)
                 KeyBindingRecorder(title: L("Scarta"), binding: $prefs.dismiss, reset: .escape)
                 KeyBindingRecorder(title: L("Riscrivi la selezione"), binding: $prefs.rewrite, reset: .controlOptionR)
+                KeyBindingRecorder(title: L("Correggi il paragrafo"), binding: $prefs.proofread, reset: .controlOptionG)
+                KeyBindingRecorder(title: L("Sinonimi della selezione"), binding: $prefs.synonyms, reset: .controlOptionS)
             } header: {
                 Text(L("Tasti"))
             } footer: {
@@ -226,6 +228,26 @@ private struct SuggestionSettings: View {
                 Text(L("Quando e quanto"))
             } footer: {
                 Footnote(L("Il suggerimento arriva dopo una pausa nella scrittura. A metà riga il seguito deve raccordarsi con il testo che c'è dopo il cursore: funziona, ma non sempre bene. Con una parola che sembra sbagliata il suggerimento la allungherebbe con l'errore: meglio niente. A batteria la pausa si allunga della metà, lo schermo non si legge e il modello si spegne dopo i minuti di inattività scelti in Motori."))
+            }
+
+            Section {
+                Toggle(L("Sottolinea gli errori mentre scrivo"), isOn: $prefs.proofreading)
+                Toggle(L("Controlla anche la grammatica con Apple Intelligence"), isOn: $prefs.grammarCheck)
+                    .disabled(!prefs.proofreading)
+                if !prefs.learnedWords.isEmpty {
+                    HStack {
+                        Text(L("%@ parole ignorate", Format.integer(prefs.learnedWords.count))).foregroundStyle(.secondary)
+                        Spacer()
+                        Button(L("Segnala di nuovo")) {
+                            prefs.learnedWords = []
+                            SpellGuard.learned = []
+                        }
+                    }
+                }
+            } header: {
+                Text(L("Correttore"))
+            } footer: {
+                Footnote(L("Quando ti fermi un attimo il paragrafo si controlla: l'ortografia subito, in italiano e in inglese insieme (i termini inglesi in una frase italiana non sono errori); la grammatica a frase finita, con Apple Intelligence sul Mac. Gli errori si sottolineano (rosso ortografia, blu grammatica); %@ apre le correzioni, Invio le applica. Con del testo selezionato la stessa scorciatoia lo corregge in Riscrivi.", prefs.proofread.display))
             }
 
             Section {

@@ -3,6 +3,19 @@
 English notes, same format as CHANGELOG.md (the Italian one is the reference). The app uses these when its language
 is English; versions missing here fall back to the Italian notes.
 
+## 0.5.5 · 2026-11-07
+
+A proofreader instead of Grammarly, synonyms, and suggestions that learn app by app.
+
+### New
+- **Proofreader.** When you pause for a moment the paragraph is checked: spelling right away, grammar, agreement and punctuation once a sentence is finished, with Apple Intelligence on your Mac. Mistakes are underlined, red for spelling and blue for grammar; ⌃⌥G opens the corrections and Return applies them all. With text selected the same shortcut corrects it in Rewrite. "Ignore" teaches the proofreader a word.
+- **Synonyms.** Select a word and press ⌃⌥S: nearby words from the macOS vocabulary right away, then Apple Intelligence alternatives that fit the sentence, with the same gender, number and tense. A number picks one.
+
+### Improvements
+- **Italian and English together.** The proofreader and the typo check accept English words in an Italian sentence (deploy, meeting, feedback, slide) and never translate.
+- **Suggestions that learn app by app.** Where you hardly ever take suggestions you get fewer, only those the model is very sure about; where you take them often they can run longer. Counts only, on your Mac.
+- **Anchored to the document.** In a document, a note or a page the window title (without the app name) enters the model's context.
+
 ## 0.5.0 · 2026-11-07
 
 Gemma inside the app, a keyboard that never waits, and Mail.

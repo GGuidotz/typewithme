@@ -15,6 +15,8 @@ struct KeyBinding: Codable, Equatable {
     static let shiftTab = KeyBinding(keyCode: 48, modifiers: CGEventFlags.maskShift.rawValue)
     static let escape = KeyBinding(keyCode: 53, modifiers: 0)
     static let controlOptionR = KeyBinding(keyCode: 15, modifiers: CGEventFlags.maskControl.rawValue | CGEventFlags.maskAlternate.rawValue)
+    static let controlOptionG = KeyBinding(keyCode: 5, modifiers: CGEventFlags.maskControl.rawValue | CGEventFlags.maskAlternate.rawValue)
+    static let controlOptionS = KeyBinding(keyCode: 1, modifiers: CGEventFlags.maskControl.rawValue | CGEventFlags.maskAlternate.rawValue)
 
     init(keyCode: UInt16, modifiers: UInt64) {
         self.keyCode = keyCode

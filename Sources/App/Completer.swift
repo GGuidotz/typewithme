@@ -85,6 +85,12 @@ final class Completer: ObservableObject {
 
     /// Chiamato dalla scorciatoia "Riscrivi la selezione".
     var onRewriteRequested: (() -> Void)?
+    /// Le scorciatoie del correttore e dei sinonimi (AppModel).
+    var onProofreadRequested: (() -> Void)?
+    var onSynonymsRequested: (() -> Void)?
+    /// Il testo del campo cambia (un tasto che scrive o cancella) o si cambia campo, app, posto: il correttore riparte.
+    var onTextChanged: (() -> Void)?
+    var onContextLost: (() -> Void)?
     /// Vero mentre il pannello "Riscrivi" è aperto: nei nostri campi non si suggerisce.
     var ignoreOwnProcess = false
 
@@ -137,7 +143,10 @@ final class Completer: ObservableObject {
         // (WindowText, WebAccessibility, la domanda all'app in FocusReader) lo imposta sul suo elemento.
         AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.5)
         monitor.onKeyDown = { [unowned self] stroke, action in self.handle(stroke, action: action) }
-        monitor.onMouseDown = { [unowned self] in self.dismiss(reason: nil) }
+        monitor.onMouseDown = { [unowned self] in
+            self.dismiss(reason: nil)
+            self.onContextLost?()
+        }
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.appChanged() }
@@ -332,6 +341,7 @@ final class Completer: ObservableObject {
         let enabled = prefs.enabled && monitor.isRunning
         let text = suggestion?.text
         let acceptWord = prefs.acceptWord, acceptAll = prefs.acceptAll, dismiss = prefs.dismiss, rewrite = prefs.rewrite
+        let proofread = prefs.proofread, synonyms = prefs.synonyms
         let accepted = lastAcceptAt
         monitor.state.withLock { tap in
             tap.enabled = enabled
@@ -340,6 +350,8 @@ final class Completer: ObservableObject {
             tap.acceptAll = acceptAll
             tap.dismiss = dismiss
             tap.rewrite = rewrite
+            tap.proofread = proofread
+            tap.synonyms = synonyms
             tap.lastAcceptAt = accepted
         }
     }
@@ -357,6 +369,7 @@ final class Completer: ObservableObject {
         historyField = nil
         ownWriting = nil
         dismiss(reason: nil)
+        onContextLost?()
     }
 
     // MARK: - Tasti
@@ -372,6 +385,14 @@ final class Completer: ObservableObject {
         case .rewrite:
             dismiss(reason: nil)
             onRewriteRequested?()
+            return
+        case .proofread:
+            dismiss(reason: nil)
+            onProofreadRequested?()
+            return
+        case .synonyms:
+            dismiss(reason: nil)
+            onSynonymsRequested?()
             return
         case .holdAfterAccept:
             return
@@ -403,6 +424,8 @@ final class Completer: ObservableObject {
             dismiss(reason: nil)
             return
         }
+        // Ogni altro tasto cambia il testo o sposta il cursore: le sottolineature del correttore vanno ricalcolate.
+        onTextChanged?()
         if let suggestion {
             if s.isPrintable, !s.characters.isEmpty, suggestion.text.hasPrefix(s.characters) {
                 // Stai scrivendo proprio quello che era suggerito: il suggerimento avanza.
@@ -561,6 +584,7 @@ final class Completer: ObservableObject {
                                       ownWriting: baseModel ? [] : ownWritingFor(field: field, before: before),
                                       wordLimit: prefs.maxWords)
         draft.windowTitle = window.title
+        draft.strictness = adaptation.strictness(for: field.bundleID)
         if baseModel {
             draft.quoted = window.quoted
             draft.personal = personalCandidates(before: before)
@@ -831,6 +855,7 @@ final class Completer: ObservableObject {
         streaming = false
         cutShort = false
         stats.shown += 1
+        if s.source != .memory { adaptation.noteShown(field.bundleID); saveAdaptation() }
         let info = FocusReader.caretInfo(field, afterNewline: context.before.last?.isNewline == true)
         let caret = info.rect
         tally(caret == nil ? "no caret (\(info.source))" : "shown", app: field.bundleID)
@@ -903,6 +928,23 @@ final class Completer: ObservableObject {
         guard !acceptedCurrent else { return }
         acceptedCurrent = true
         stats.acceptedSuggestions += 1
+        if let bundleID = field?.bundleID, suggestion?.source != .memory {
+            adaptation.noteAccepted(bundleID)
+            saveAdaptation()
+        }
+    }
+
+    // MARK: - Adattamento per app
+
+    /// Quanto accetti i suggerimenti app per app (AppAdaptation): le soglie si stringono dove non li prendi mai.
+    private(set) var adaptation: AppAdaptation = {
+        guard let data = UserDefaults.standard.data(forKey: "appAdaptation"),
+              let value = try? JSONDecoder().decode(AppAdaptation.self, from: data) else { return AppAdaptation() }
+        return value
+    }()
+
+    private func saveAdaptation() {
+        if let data = try? JSONEncoder().encode(adaptation) { UserDefaults.standard.set(data, forKey: "appAdaptation") }
     }
 
     private func finishSuggestion(learn: Bool) {

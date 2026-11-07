@@ -42,9 +42,13 @@ struct ConfidenceStop {
     private var wordLogSum = 0.0
     private var wordTokens = 0
 
-    init(length: SuggestionLength, maxWords: Int? = nil) {
+    /// Moltiplica le soglie della prima parola e della media (AppAdaptation): più di 1 è più severo.
+    let strictness: Double
+
+    init(length: SuggestionLength, maxWords: Int? = nil, strictness: Double = 1) {
         self.length = length
         self.maxWords = max(1, maxWords ?? length.maxWords)
+        self.strictness = min(max(strictness, 0.5), 2)
     }
 
     /// La probabilità media per token della prima parola (o del resto della parola in corso). Le soglie vengono dalle
@@ -81,9 +85,9 @@ struct ConfidenceStop {
         if startsWord, hasWord {
             // Una parola è finita: si tiene se il modello ne era sicuro.
             words += 1
-            if words == 1, wordMean < Self.firstWordFloor { rejected = true; reason = .firstWord; return true }
+            if words == 1, wordMean < Self.firstWordFloor * strictness { rejected = true; reason = .firstWord; return true }
             if words > 1, wordMean < Self.wordFloor { reason = .weakWord; return true }
-            if words > 1, average < averageFloor { reason = .average; return true }
+            if words > 1, average < averageFloor * strictness { reason = .average; return true }
             confident = text
             if words >= maxWords { reason = .maxWords; return true }
             wordLogSum = 0
@@ -108,12 +112,12 @@ struct ConfidenceStop {
         if reason == nil { reason = natural ? .natural : .limit }
         if words == 0 {
             // Una parola sola, mai chiusa da uno spazio: vale la soglia della prima.
-            if natural, wordMean >= Self.firstWordFloor { return text }
+            if natural, wordMean >= Self.firstWordFloor * strictness { return text }
             if natural { reason = .firstWord }
             return ""
         }
         if natural {
-            if wordMean >= Self.wordFloor, average >= averageFloor { return text }
+            if wordMean >= Self.wordFloor, average >= averageFloor * strictness { return text }
             reason = wordMean < Self.wordFloor ? .weakWord : .average
         }
         return confident

@@ -155,6 +155,11 @@ struct CompletionRequest {
     var wordLimit: Int = 0
     /// Il titolo della finestra in cui si scrive (oggetto della mail, nome del documento, chat), se Contesto dall'app.
     var windowTitle: String?
+    /// Il messaggio a cui rispondi, quando sta nello stesso campo sotto il cursore (la mail citata in una risposta).
+    var quoted: String?
+    /// Le parole che di solito scrivi qui secondo il modello personale, e quanto contano (0: niente, 1: solo loro).
+    var personal: [PersonalCandidate] = []
+    var personalWeight: Double = 0
 
     var maxWords: Int { wordLimit > 0 ? wordLimit : length.maxWords }
     var maxTokens: Int { maxWords * 2 + 8 }

@@ -47,7 +47,9 @@ final class GhostOverlay {
         let probe = CGPoint(x: x, y: screenHeight - caret.maxY + caret.height / 2)
         let screen = NSScreen.screens.first(where: { $0.frame.contains(probe) }) ?? NSScreen.main
         var right = (screen?.visibleFrame.maxX ?? x + 2000) - 6
-        if let fieldFrame, fieldFrame.width > 40 { right = Swift.min(right, fieldFrame.maxX - 4) }
+        // Il bordo del campo solo se il cursore ci sta dentro: nei campi web il rettangolo del campo a volte è di un
+        // altro elemento, e il testo finiva tagliato a zero.
+        if let fieldFrame, fieldFrame.width > 40, fieldFrame.maxX - 4 - x > 24 { right = Swift.min(right, fieldFrame.maxX - 4) }
         let lineHeight = Swift.max(caret.height, ceil(font.ascender - font.descender + font.leading))
 
         var left = x

@@ -3,6 +3,36 @@
 English notes, same format as CHANGELOG.md (the Italian one is the reference). The app uses these when its language
 is English; versions missing here fall back to the Italian notes.
 
+## 0.5.0 · 2026-11-07
+
+Gemma inside the app, a keyboard that never waits, and Mail.
+
+### New
+- **Gemma inside the app.** With a base model already on the Mac (like Cotypist's) Gemma runs inside Type_w/Me, with no server and no HTTP requests: the first piece of a suggestion arrives in 15-50 milliseconds instead of 90-120, and if you type exactly what the model predicted, the next suggestion is already there. Without the llama.cpp libraries, or with an instruction-tuned model, llama-server stays.
+
+### Improvements
+- **Keyboard always responsive.** The tap that intercepts Tab and Esc runs on its own thread and decides without waiting for the rest of the app: before, every key in every app waited for Type_w/Me's main thread, and a slow Accessibility read could freeze the whole Mac's keyboard. Accessibility queries now wait half a second at most.
+- **The pause follows your rhythm.** A continuation is requested after a little over half your typical interval between keys (60 to 250 ms), never before the chosen pause: not in the middle of a burst of keys, but right away when you stop.
+- **Mail, Safari and WebKit apps.** WebKit fields do not give text positions, only "text markers": the field, the text before and after the caret and the caret are now read that way too, and suggestions appear where the field used to be missing. If a field still is not found, diagnostics say what it exposes (role and attributes, never text).
+- **Screen context actually arrives.** When Accessibility gave only a scrap of the window, the context stayed frozen for 45 seconds with that scrap, and the text recognised on screen, which arrives a moment later, never reached the prompt. Now it comes in with the next request, and for base models the context in front of the text grows from 500 to 800 characters.
+- **Less memory on 8 GB Macs.** There "Keep the model ready" starts off: Gemma stops after the chosen minutes instead of staying in memory. Screen context is re-read at most every 15 seconds in the same window (immediately when you switch window).
+
+## 0.4.0 · 2026-10-29
+
+Longer, more sensible suggestions with the Cotypist model.
+
+### New
+- **Learns from you.** A personal model, built on the Mac from the encrypted typing history, knows the words you usually write after the previous one or two. Before each suggestion it is compared with Gemma's most likely words: if one of yours wins, the suggestion starts there. "Word choice" in Settings › Personalization sets its weight; it learns from every new text.
+- **Context like a real document.** With Gemma base the context is no longer a header of instructions: in Mail the subject and the message you are replying to, quoted with "> "; in chats the last messages, one per line. Only written text, no menus or buttons, and it stays fixed while you type in the same field.
+
+### Improvements
+- **Better length.** A suggestion keeps going while the average per-token probability stays high, instead of multiplying word probabilities: with Italian words split into several pieces it almost always stopped after the first word.
+- **Clean prompt for base models.** Gemma base no longer gets English instructions, the clipboard or whole past texts in front of it, which confused it. The prompt only grows at the end and stays in the cache, so answers are faster.
+- **No repetition penalty.** It pushed the model away from common words and made suggestions sound unnatural.
+- **More apps.** Chrome and Electron apps (Slack, Discord, Notion, VS Code, Obsidian) only build their accessibility tree when someone asks: Type_w/Me now asks when they come to the front, so the caret and text can be read there too. If the system-wide query fails, the field is looked up in the frontmost app.
+- **No HTML tags.** The model sometimes went on with `<strong>`, `</p>` or `**`: the suggestion now stops there, unless you are writing HTML or markdown.
+- **Per-app diagnostics.** The report shows, app by app, how many suggestions appeared and why none did elsewhere (no field, no text, text after the cursor, no caret, model unsure), and how model answers stop. Counts only.
+
 ## 0.3.0 · 2026-10-28
 
 Suggeritore becomes Type_w/Me: faster suggestions, context from the screen, an encrypted typing history that learns your words, and llama.cpp built into the app. Everything stays on the Mac.

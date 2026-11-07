@@ -36,7 +36,7 @@ struct PersonalizationSettings: View {
                     Text(L("Forte")).tag(3)
                 }
                 .pickerStyle(.segmented)
-                Footnote(L("Usa i tuoi testi della stessa app per imitarne le parole. Più è forte, più testi tuoi entrano nel contesto; troppo forte può proporre parole meno adatte."))
+                Footnote(L("Impara dalla cronologia le parole che scrivi di solito e le propone quando battono quelle del modello. Più è forte, più contano le tue parole; troppo forte può proporre parole meno adatte."))
             } header: {
                 Text(L("Stile"))
             }

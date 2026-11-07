@@ -44,16 +44,17 @@ final class WindowText {
             let boxField = Box(element: field.element)
             Task.detached(priority: .utility) { [weak self] in
                 let snapshot = Self.read(window: boxWindow.element, skipping: boxField.element)
-                await MainActor.run {
-                    guard let self else { return }
-                    self.running = false
-                    self.cached = (key, snapshot, Date())
-                    self.reads += 1
-                    self.lastCharacters = snapshot.text.count
-                }
+                await self?.store(snapshot, window: key)
             }
         }
         return result
+    }
+
+    private func store(_ snapshot: Snapshot, window key: Int) {
+        running = false
+        cached = (key, snapshot, Date())
+        reads += 1
+        lastCharacters = snapshot.text.count
     }
 
     func invalidate() { cached = nil }

@@ -43,14 +43,16 @@ final class LlamaServer: ObservableObject {
     }
 
     enum Backend: String {
+        /// Dentro l'app (LlamaRuntime): niente server, niente HTTP.
+        case inProcess = "in-app"
         case llamaServer = "llama-server"
         case ollama = "Ollama"
     }
 
     @Published private(set) var state: State = .stopped
     @Published private(set) var backend: Backend?
-    /// Il motore da usare, solo quando il server è pronto.
-    @Published private(set) var engine: LlamaEngine?
+    /// Il motore da usare, solo quando il server (o il modello dentro l'app) è pronto.
+    @Published private(set) var engine: (any GemmaEngine)?
     /// I modelli che Ollama ha già scaricato; nil se Ollama non è aperto (o non si è ancora controllato).
     @Published private(set) var ollamaModels: [String]?
     /// llama-server c'è (nel percorso scelto o in quelli di Homebrew).
@@ -204,7 +206,8 @@ final class LlamaServer: ObservableObject {
             if askOllama { self.ollamaModels = models }
             if let name = entry.ollamaName, let models, Self.contains(models, name) {
                 self.connectOllama(entry, name: name)
-            } else {
+            } else if !(await self.loadInProcess(entry)) {
+                guard self.state == .starting else { return }
                 self.launch(entry, attempt: 1)
             }
         }
@@ -238,6 +241,36 @@ final class LlamaServer: ObservableObject {
         let wasRunning = state == .ready || state.isBusy
         stop()
         if wasRunning { start() }
+    }
+
+    /// Un modello base già sul Mac si carica dentro l'app (LlamaRuntime): la prima parola arriva in poche decine di
+    /// millisecondi invece di un centinaio, e si riusano anche i token che il modello ha appena generato. Falso se non si
+    /// può (librerie non incluse, modello istruito o da scaricare, caricamento fallito): allora si avvia llama-server.
+    private func loadInProcess(_ entry: ModelEntry) async -> Bool {
+        #if TWM_INPROCESS_LLAMA
+        guard LlamaRuntime.isAvailable, entry.usesRawCompletion, let path = Self.modelPath(entry) else { return false }
+        launchedAt = Date()
+        let runtime = await Task.detached(priority: .userInitiated) { try? LlamaRuntime(path: path) }.value
+        guard state == .starting, currentEntry?.id == entry.id else { return true }   // fermato o cambiato nel frattempo
+        guard let runtime else {
+            diag(.engine, "gemma in-app failed to load, falling back to llama-server")
+            return false
+        }
+        backend = .inProcess
+        engine = LocalGemmaEngine(runtime: runtime, displayName: entry.title)
+        state = .ready
+        scheduleIdleTimer()
+        diag(.engine, "gemma in-app ready after \(Int(Date().timeIntervalSince(launchedAt) * 1000)) ms")
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    /// Il file GGUF del modello: quello scelto sul Mac, o quello che llama.cpp ha già scaricato nella sua cache.
+    static func modelPath(_ entry: ModelEntry) -> String? {
+        if let local = entry.localPath { return FileManager.default.fileExists(atPath: local) ? local : nil }
+        return cachedFile(entry)?.path
     }
 
     private func connectOllama(_ entry: ModelEntry, name: String) {
@@ -476,20 +509,25 @@ final class LlamaServer: ObservableObject {
     /// cambiano tra le versioni di llama.cpp, ma contengono il nome del repository).
     static func isCached(_ entry: ModelEntry) -> Bool {
         if entry.localPath != nil { return true }
-        guard let repo = entry.hfRepo else { return false }
+        return cachedFile(entry) != nil
+    }
+
+    /// Il file GGUF del modello nella cache di llama.cpp, se c'è.
+    static func cachedFile(_ entry: ModelEntry) -> URL? {
+        guard let repo = entry.hfRepo else { return nil }
         let last = repo.split(separator: "/").last.map(String.init) ?? repo
         let name = last.lowercased().replacingOccurrences(of: "-gguf", with: "")
         let fm = FileManager.default
-        guard let caches = fm.urls(for: .cachesDirectory, in: .userDomainMask).first else { return false }
+        guard let caches = fm.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
         let base = caches.appendingPathComponent("llama.cpp", isDirectory: true)
-        guard let files = fm.enumerator(at: base, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { return false }
+        guard let files = fm.enumerator(at: base, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { return nil }
         var seen = 0
         for case let url as URL in files {
             seen += 1
             if seen > 1000 { break }
             let file = url.lastPathComponent.lowercased()
-            if file.hasSuffix(".gguf"), file.contains(name) { return true }
+            if file.hasSuffix(".gguf"), file.contains(name), !file.hasPrefix("mmproj") { return url }
         }
-        return false
+        return nil
     }
 }

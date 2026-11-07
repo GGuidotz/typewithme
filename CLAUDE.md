@@ -39,3 +39,9 @@ app: testo grigio dopo il cursore, Tab per accettare. Tutto sul Mac. Stesso sche
   contesto dallo schermo (`Sources/App/Input/ScreenContext.swift`, solo in memoria), contesto dall'app via Accessibilità (`Sources/App/Input/WindowText.swift`, fermo per campo per non rompere la cache), cronologia di scrittura cifrata
   (`Sources/App/TypingHistory.swift`, AES-GCM con chiave nel Portachiavi). Per Gemma il testo prima del cursore ha
   l'inizio ancorato (`TextContext.anchored`): non cambiarlo in una finestra che scorre, romperebbe la cache del prompt.
+- Dalla 0.5.0: Gemma dentro l'app (`Sources/App/Engines/LlamaRuntime.swift`: `LlamaRuntime` chiama libllama, `LocalGemmaEngine`
+  per i modelli base), compilato solo per arm64 con `TWM_INPROCESS_LLAMA` contro gli header in `Vendor/llama` (stessa
+  build di `packaging/llama.cpp-version`, `Vendor/llama/TAG`; si aggiornano con `tools/update-llama-headers.sh`).
+  `LlamaServer.loadInProcess` lo prova prima di llama-server. Il tap della tastiera gira su un thread suo e decide con
+  `TapState` (KeyMonitor.swift); il Completer lo tiene aggiornato con `syncTap()`. I campi WebKit (Mail) si leggono con
+  i text marker (`FocusReader.markerField`).

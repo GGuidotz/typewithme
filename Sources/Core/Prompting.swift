@@ -72,36 +72,78 @@ enum Prompting {
     /// Caratteri al massimo del testo dello schermo nel prompt.
     static let maxScreen = 800
 
-    /// Il prompt per un modello base, che non segue istruzioni ma continua un documento: un'intestazione con le tue
-    /// istruzioni, i tuoi scritti, lo schermo e gli appunti, e poi il testo da continuare. L'intestazione cambia di
-    /// rado, quindi resta nella cache del prompt; senza niente da dire, il prompt è il testo e basta.
+    /// Il prompt per un modello base, che non segue istruzioni ma continua un documento. Fino alla 0.3.0 c'era
+    /// un'intestazione con istruzioni in inglese, testi tuoi, schermo e appunti: un modello da 1B la prendeva per il
+    /// documento da continuare (scriveva "---", etichette, pezzi di pulsanti). Ora il contesto ha la forma di un
+    /// documento vero, quella che il modello ha visto mille volte: in una mail l'oggetto e il messaggio a cui rispondi,
+    /// citato con "> "; in una chat gli ultimi messaggi, una riga ciascuno. Solo righe di testo scritto (niente menu,
+    /// pulsanti, orari) e al massimo `maxDocumentContext` caratteri. Senza contesto, il testo prima del cursore e basta.
+    /// Il contesto resta fermo per tutto il campo (Completer.windowContext): il prompt cresce solo in coda e resta
+    /// nella cache.
     static func rawPrompt(_ r: CompletionRequest) -> String {
-        var header: [String] = []
-        let own = r.instructions.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !own.isEmpty { header.append("About the writer: \(own)") }
-        let forApp = r.appInstructions.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !forApp.isEmpty { header.append("Writing in \(r.context.appName.isEmpty ? "this app" : r.context.appName): \(forApp)") }
-        for piece in r.ownWriting { header.append("Earlier text by the same writer:\n\(piece)") }
-        // L'app e la finestra dicono che cosa si sta scrivendo (una risposta a una mail, un messaggio in una chat), il
-        // testo della finestra il "di che cosa": un modello base lo usa se lo vede come la conversazione a cui si risponde.
-        if let title = r.windowTitle {
-            let app = r.context.appName.isEmpty ? "" : "\(r.context.appName): "
-            header.append("\(app)\(String(title.prefix(120)))")
-        }
-        if let screen = r.screen, !screen.isEmpty { header.append("In the window (what the writer is replying to):\n\(String(screen.prefix(maxScreen)))") }
-        // Un modello base copia quello che vede: dagli appunti solo testo scritto, non codici, link o colonne di numeri.
-        if let clip = r.clipboard, isProse(clip) { header.append("Clipboard:\n\(String(clip.prefix(500)))") }
-        guard !header.isEmpty else { return r.context.before }
-        return header.joined(separator: "\n\n") + "\n\n---\nThe writer's text:\n" + r.context.before
+        let head = documentContext(r)
+        return head.isEmpty ? r.context.before : head + "\n\n" + r.context.before
     }
 
-    /// Almeno quattro parole e soprattutto lettere.
-    static func isProse(_ text: String) -> Bool {
-        let sample = text.prefix(500)
-        let letters = sample.filter { $0.isLetter }.count
-        let visible = sample.filter { !$0.isWhitespace }.count
-        let words = sample.split(whereSeparator: { $0.isWhitespace }).filter { $0.contains(where: { $0.isLetter }) }.count
-        return words >= 4 && visible > 0 && Double(letters) / Double(visible) >= 0.7
+    /// Caratteri al massimo del contesto davanti al testo, per un modello base.
+    static let maxDocumentContext = 800
+
+    enum AppKind { case mail, chat, other }
+
+    static func appKind(_ bundleID: String) -> AppKind {
+        let id = bundleID.lowercased()
+        let mail = ["com.apple.mail", "com.microsoft.outlook", "com.readdle.smartemail", "com.superhuman", "it.bloop.airmail",
+                    "com.mimestream", "com.google.gmail"]
+        let chat = ["com.apple.mobilesms", "net.whatsapp", "desktop.whatsapp", "com.tinyspeck.slackmacgap", "ru.keepcoder.telegram",
+                    "org.telegram", "com.hnc.discord", "org.whispersystems.signal", "com.microsoft.teams", "com.facebook.archon",
+                    "com.anthropic.claudefordesktop", "com.openai.chat"]
+        if mail.contains(where: { id.hasPrefix($0) }) { return .mail }
+        if chat.contains(where: { id.hasPrefix($0) }) { return .chat }
+        return .other
+    }
+
+    static func documentContext(_ r: CompletionRequest) -> String {
+        let kind = appKind(r.context.bundleID)
+        let italian = (r.language ?? "it") == "it"
+        var source = [r.quoted, r.screen].compactMap { $0 }.joined(separator: "\n")
+        source = String(source.prefix(4000))
+        var lines = proseLines(source)
+        // Il pezzo più vicino a quello che scrivi: in una chat gli ultimi messaggi, in una mail citata l'inizio.
+        var budget = maxDocumentContext
+        var kept: [String] = []
+        let ordered = r.quoted != nil && kind == .mail ? lines : Array(lines.reversed())
+        for line in ordered {
+            let piece = String(line.prefix(300))
+            guard budget - piece.count > 0 else { break }
+            kept.append(piece)
+            budget -= piece.count + 1
+        }
+        if !(r.quoted != nil && kind == .mail) { kept.reverse() }
+        lines = kept
+        var out = ""
+        switch kind {
+        case .mail:
+            if let title = r.windowTitle?.trimmingCharacters(in: .whitespaces), !title.isEmpty {
+                out += (italian ? "Oggetto: " : "Subject: ") + String(title.prefix(120)) + "\n"
+            }
+            if !lines.isEmpty { out += (out.isEmpty ? "" : "\n") + lines.map { "> " + $0 }.joined(separator: "\n") }
+        case .chat, .other:
+            out = lines.joined(separator: "\n")
+        }
+        return out.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Le righe che sembrano testo scritto: almeno tre parole, quasi tutte lettere, senza indirizzi web.
+    static func proseLines(_ text: String) -> [String] {
+        text.split(whereSeparator: { $0.isNewline }).compactMap { raw in
+            let line = raw.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+            let words = line.split(separator: " ").filter { $0.contains(where: { $0.isLetter }) }
+            guard words.count >= 3, !line.contains("://"), !line.contains("www.") else { return nil }
+            let visible = line.filter { !$0.isWhitespace }
+            let letters = visible.filter { $0.isLetter }.count
+            guard !visible.isEmpty, Double(letters) / Double(visible.count) >= 0.75 else { return nil }
+            return line
+        }
     }
 
     private static let labels = ["Continuation:", "Completion:", "Output:", "Text:"]
@@ -150,6 +192,9 @@ enum Prompting {
             }
         }
         text = collapseSpaces(text)
+        // Un modello base ha letto molte pagine web: a volte continua con tag HTML o grassetto markdown. Il seguito
+        // finisce lì, a meno che tu non stia scrivendo proprio HTML o markdown.
+        text = cuttingMarkup(text, before: r.context.before)
 
         // Se ripete la fine del testo già scritto, via la parte ripetuta.
         text = removingOverlap(text, before: r.context.before)
@@ -231,6 +276,20 @@ enum Prompting {
         case .medium: "short: one sentence, at most \(words) words"
         case .long: "at most two sentences, at most \(words) words"
         }
+    }
+
+    /// Il seguito fino al primo tag (`<strong>`, `</p>`, `<br/>`) o al primo `**`, se il testo prima del cursore non
+    /// ne contiene: "e poi <strong>domani" → "e poi".
+    static func cuttingMarkup(_ text: String, before: String) -> String {
+        var cut = text.endIndex
+        if !before.contains("<"), let tag = text.range(of: "</?[A-Za-z][A-Za-z0-9]*", options: .regularExpression) {
+            cut = tag.lowerBound
+        }
+        if !before.contains("**"), let bold = text.range(of: "**"), bold.lowerBound < cut {
+            cut = bold.lowerBound
+        }
+        guard cut < text.endIndex else { return text }
+        return String(text[..<cut]).replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
     }
 
     static func collapseSpaces(_ text: String) -> String {

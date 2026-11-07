@@ -160,6 +160,9 @@ struct CompletionRequest {
     /// Le parole che di solito scrivi qui secondo il modello personale, e quanto contano (0: niente, 1: solo loro).
     var personal: [PersonalCandidate] = []
     var personalWeight: Double = 0
+    /// Quanto essere sicuri prima di suggerire in questa app (AppAdaptation): 1 normale, di più dove i suggerimenti
+    /// non si prendono quasi mai.
+    var strictness: Double = 1
 
     var maxWords: Int { wordLimit > 0 ? wordLimit : length.maxWords }
     var maxTokens: Int { maxWords * 2 + 8 }
@@ -216,7 +219,7 @@ enum RewritePreset: String, CaseIterable, Identifiable {
         case .shorter: "Rewrite the text so it is noticeably shorter, keeping every piece of information and the same tone."
         case .formal: "Rewrite the text in a more formal, professional register, keeping the meaning."
         case .casual: "Rewrite the text in a more relaxed, friendly register, keeping the meaning."
-        case .fix: "Correct spelling, grammar, accents and punctuation. Change nothing else: same words, same order, same tone."
+        case .fix: "Correct spelling, grammar, accents and punctuation. Change nothing else: same words, same order, same tone. The text may mix Italian and English: keep English terms used in Italian as they are and never translate."
         }
     }
 }

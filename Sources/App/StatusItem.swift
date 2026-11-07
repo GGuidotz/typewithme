@@ -77,6 +77,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         rewrite.target = self
         rewrite.toolTip = prefs.rewrite.display
         menu.addItem(rewrite)
+        let proofread = NSMenuItem(title: L("Correggi il paragrafo"), action: #selector(proofreadParagraph), keyEquivalent: "")
+        proofread.target = self
+        proofread.toolTip = prefs.proofread.display
+        menu.addItem(proofread)
+        let synonyms = NSMenuItem(title: L("Sinonimi della selezione"), action: #selector(showSynonyms), keyEquivalent: "")
+        synonyms.target = self
+        synonyms.toolTip = prefs.synonyms.display
+        menu.addItem(synonyms)
         menu.addItem(.separator())
 
         menu.addItem(withTitle: L("Impostazioni…"), action: #selector(openSettings), keyEquivalent: ",").target = self
@@ -98,6 +106,14 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     @objc private func rewriteSelection() {
         // Il menu si chiude e il fuoco torna all'app: un attimo prima di leggere la selezione.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.model.rewrite.trigger() }
+    }
+
+    @objc private func proofreadParagraph() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.model.proofreader.trigger() }
+    }
+
+    @objc private func showSynonyms() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in self?.model.synonyms.trigger() }
     }
 
     @objc private func openPermissions() { model.showOnboarding() }

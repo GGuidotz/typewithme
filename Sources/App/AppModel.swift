@@ -13,6 +13,8 @@ final class AppModel: ObservableObject {
     let prefs: Preferences
     let completer: Completer
     let rewrite: RewriteController
+    let proofreader: Proofreader
+    let synonyms: SynonymsController
     let updater: Updater
     @Published var settingsTab: SettingsTab = .general
 
@@ -29,12 +31,25 @@ final class AppModel: ObservableObject {
         self.completer = completer
         rewrite = RewriteController(prefs: prefs, completer: completer)
         updater = Updater(prefs: prefs)
+        proofreader = Proofreader(prefs: prefs)
+        synonyms = SynonymsController(completer: completer)
         completer.onRewriteRequested = { [weak self] in self?.rewrite.trigger() }
+        completer.onProofreadRequested = { [weak self] in self?.proofreader.trigger() }
+        completer.onSynonymsRequested = { [weak self] in self?.synonyms.trigger() }
+        completer.onTextChanged = { [weak self] in self?.proofreader.textChanged() }
+        completer.onContextLost = { [weak self] in self?.proofreader.reset() }
+        // Con del testo selezionato la scorciatoia del correttore corregge la selezione in Riscrivi.
+        proofreader.onProofreadSelection = { [weak self] in
+            guard let self else { return }
+            self.rewrite.trigger()
+            self.rewrite.run(.fix)
+        }
     }
 
     func didLaunch() {
         diag(.app, "launched \(appVersion), macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
         completer.start()
+        proofreader.prewarm()
         updater.start()
     }
 

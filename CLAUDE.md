@@ -45,3 +45,8 @@ app: testo grigio dopo il cursore, Tab per accettare. Tutto sul Mac. Stesso sche
   `LlamaServer.loadInProcess` lo prova prima di llama-server. Il tap della tastiera gira su un thread suo e decide con
   `TapState` (KeyMonitor.swift); il Completer lo tiene aggiornato con `syncTap()`. I campi WebKit (Mail) si leggono con
   i text marker (`FocusReader.markerField`).
+- Dalla 0.5.5: correttore (`Sources/App/Proofreader.swift`: ortografia con NSSpellChecker in it+en, grammatica con
+  Apple Intelligence a frase finita, differenze in `Sources/Core/TextDiff.swift`, sottolineature in
+  `Sources/App/Input/UnderlineOverlay.swift`), sinonimi (`Sources/App/Synonyms.swift`), soglie per app imparate da
+  quello che accetti (`Sources/Core/AppAdaptation.swift`, `ConfidenceStop.strictness`). Scorciatoie nel tap
+  (`TapState.proofread`, `TapState.synonyms`).

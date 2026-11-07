@@ -328,3 +328,28 @@
 "llama.cpp è incluso nell'app: Gemma è pronto." = "llama.cpp is included in the app: Gemma is ready.";
 "Parole al massimo" = "Maximum words";
 "Fino a %d parole: il suggerimento si ferma prima se il modello non è sicuro della parola dopo." = "Up to %d words: the suggestion stops earlier when the model is not sure of the next word.";
+
+/* 0.5.5: correttore e sinonimi */
+"%@ parole ignorate" = "%@ ignored words";
+"Applica" = "Apply";
+"Applica tutto" = "Apply all";
+"Cerco alternative adatte alla frase…" = "Looking for alternatives that fit the sentence…";
+"Controlla anche la grammatica con Apple Intelligence" = "Also check grammar with Apple Intelligence";
+"Controllo la grammatica…" = "Checking grammar…";
+"Correggi il paragrafo" = "Proofread paragraph";
+"Correttore" = "Proofreading";
+"Grammatica" = "Grammar";
+"Ignora" = "Ignore";
+"Invio applica tutto, Esc chiude." = "Return applies all, Esc closes.";
+"Nessun errore nel paragrafo." = "No mistakes in this paragraph.";
+"Nessuna alternativa trovata." = "No alternatives found.";
+"Ortografia" = "Spelling";
+"Quando ti fermi un attimo il paragrafo si controlla: l'ortografia subito, in italiano e in inglese insieme (i termini inglesi in una frase italiana non sono errori); la grammatica a frase finita, con Apple Intelligence sul Mac. Gli errori si sottolineano (rosso ortografia, blu grammatica); %@ apre le correzioni, Invio le applica. Con del testo selezionato la stessa scorciatoia lo corregge in Riscrivi." = "When you pause for a moment the paragraph is checked: spelling right away, in Italian and English together (English terms in an Italian sentence are not mistakes); grammar once a sentence is finished, with Apple Intelligence on your Mac. Mistakes are underlined (red for spelling, blue for grammar); %@ opens the corrections and Return applies them. With text selected, the same shortcut corrects it in Rewrite.";
+"Segnala di nuovo" = "Flag again";
+"Seleziona una parola o un'espressione breve." = "Select a word or a short expression.";
+"Seleziona una parola, poi premi di nuovo la scorciatoia." = "Select a word, then press the shortcut again.";
+"Sinonimi" = "Synonyms";
+"Sinonimi della selezione" = "Synonyms for selection";
+"Sottolinea gli errori mentre scrivo" = "Underline mistakes as I type";
+"Sto controllando il paragrafo." = "Checking the paragraph.";
+"Un numero sceglie, Esc chiude." = "A number picks, Esc closes.";

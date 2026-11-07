@@ -3,6 +3,19 @@
 Formato: `## <versione> · <data>`, poi `### Novità`, `### Miglioramenti`, `### Correzioni`, una riga `- ` per
 cambiamento. L'app mostra la sezione della sua versione in Impostazioni › Aggiornamenti (Sources/App/Changelog.swift).
 
+## 0.5.5 · 2026-11-07
+
+Un correttore al posto di Grammarly, sinonimi, e suggerimenti che imparano app per app.
+
+### Novità
+- **Correttore.** Quando ti fermi un attimo il paragrafo si controlla: l'ortografia subito, la grammatica, le concordanze e la punteggiatura a frase finita con Apple Intelligence, sul Mac. Gli errori si sottolineano sotto la parola, rosso l'ortografia e blu la grammatica; ⌃⌥G apre le correzioni e Invio le applica tutte. Con del testo selezionato la stessa scorciatoia lo corregge in Riscrivi. "Ignora" insegna una parola al correttore.
+- **Sinonimi.** Selezioni una parola e premi ⌃⌥S: subito le parole vicine nel vocabolario di macOS, poi quelle di Apple Intelligence adatte alla frase, con lo stesso genere, numero e tempo. Un numero sceglie.
+
+### Miglioramenti
+- **Italiano e inglese insieme.** Correttore e controllo dei refusi accettano le parole inglesi in una frase italiana (deploy, meeting, feedback, slide) e non traducono mai.
+- **Suggerimenti che imparano app per app.** Dove i suggerimenti non li prendi quasi mai se ne mostrano meno e solo quelli di cui il modello è molto sicuro; dove li prendi spesso possono andare avanti di più. Solo conteggi, sul Mac.
+- **Ancorati al documento.** In un documento, una nota o una pagina il titolo della finestra (senza il nome dell'app) entra nel contesto del modello.
+
 ## 0.5.0 · 2026-11-07
 
 Gemma dentro l'app, una tastiera che non aspetta mai e Mail.

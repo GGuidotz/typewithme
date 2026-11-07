@@ -34,6 +34,9 @@ final class ScreenContext {
 
     /// Quante catture sono riuscite e quanto è durata l'ultima (cattura e OCR), per la diagnostica.
     private(set) var captures = 0
+
+    /// Vero mentre una cattura con OCR è in corso: il testo arriverà tra poco.
+    var isRefreshing: Bool { task != nil }
     private(set) var lastDurationMs: Int?
 
     // MARK: - Permesso

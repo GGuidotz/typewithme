@@ -72,7 +72,7 @@ final class Completer: ObservableObject {
     let screen = ScreenContext()
     let windowText = WindowText()
     /// Il contesto della finestra fermo per campo: cambia di rado, così il prompt resta nella cache di llama.cpp.
-    private var frozenContext: (field: String, title: String?, text: String?, quoted: String?, date: Date)?
+    private var frozenContext: (field: String, title: String?, text: String?, quoted: String?, expires: Date)?
     /// Il modello personale (Sources/Core/PersonalModel.swift), costruito dalla cronologia di scrittura e tenuto al passo.
     private var personal = PersonalModel()
     private var personalLearned = Set<UUID>()
@@ -708,10 +708,10 @@ final class Completer: ObservableObject {
 
     /// A batteria, se la modalità batteria è accesa: pausa una volta e mezza (con una pausa fissa di 300 ms i
     /// suggerimenti sembravano lenti; il risparmio vero viene dallo schermo non letto e dal modello che si spegne).
-    /// Nessuna richiesta prima del tuo ritmo: non si chiede un seguito prima di una volta e mezza il tuo intervallo
-    /// tipico tra due tasti (la mediana degli ultimi 20), tra 150 e 500 ms. Con una pausa fissa più corta del ritmo di
-    /// scrittura si leggeva il campo e si chiedeva un seguito a quasi ogni tasto, e il testo grigio compariva e
-    /// spariva mentre scrivevi.
+    /// La pausa scelta, ma non meno di poco più di metà del tuo intervallo tipico tra due tasti (la mediana degli
+    /// ultimi 20), tra 60 e 250 ms: abbastanza per non chiedere un seguito a metà di una raffica di tasti, abbastanza
+    /// corta da sembrare immediata. Il tap della tastiera non aspetta queste richieste (KeyMonitor), quindi una pausa
+    /// corta non rallenta la scrittura.
     private var effectiveDelay: Double {
         let delay = max(prefs.delay, rhythmDelay)
         guard prefs.batterySaver, Power.shouldSave else { return delay }
@@ -719,9 +719,9 @@ final class Completer: ObservableObject {
     }
 
     private var rhythmDelay: Double {
-        guard keyIntervals.count >= 5 else { return 0.15 }
+        guard keyIntervals.count >= 5 else { return 0.06 }
         let median = keyIntervals.sorted()[keyIntervals.count / 2]
-        return min(0.5, max(0.15, median * 1.5))
+        return min(0.25, max(0.06, median * 0.6))
     }
 
     /// Il contesto della finestra in cui scrivi: titolo e testo letti con Accessibilità (Contesto dall'app) e, se
@@ -729,7 +729,7 @@ final class Completer: ObservableObject {
     /// prompt che cambia a ogni richiesta andrebbe rielaborato da capo.
     private func windowContext(field: FocusedField, before: String) -> (title: String?, text: String?, quoted: String?) {
         let key = Self.key(for: field)
-        if let f = frozenContext, f.field == key, f.text != nil || f.quoted != nil, Date().timeIntervalSince(f.date) < 45 {
+        if let f = frozenContext, f.field == key, f.text != nil || f.quoted != nil, Date() < f.expires {
             return (f.title, f.text, f.quoted)
         }
         var title: String?
@@ -739,8 +739,16 @@ final class Completer: ObservableObject {
             title = snapshot.title
             text = Self.withoutTyped(snapshot.text, before: before)
         }
-        if (text?.count ?? 0) < 200, let seen = screenIfAllowed(pid: field.pid, before: before), seen.count > (text?.count ?? 0) {
-            text = seen
+        // Poco testo dall'Accessibilità: serve lo schermo. Il primo OCR arriva qualche centinaio di millisecondi dopo;
+        // finché non c'è, il contesto si ferma solo per un attimo, così la richiesta dopo lo trova (prima restava fermo
+        // 45 secondi con il pezzetto letto dall'Accessibilità e l'OCR non entrava mai).
+        var waitingForScreen = false
+        if (text?.count ?? 0) < 200 {
+            if let seen = screenIfAllowed(pid: field.pid, before: before) {
+                if seen.count > (text?.count ?? 0) { text = seen }
+            } else {
+                waitingForScreen = screen.isRefreshing
+            }
         }
         // In una risposta di Mail il messaggio a cui rispondi sta nello stesso campo, sotto il cursore.
         if prefs.appContext, Prompting.appKind(field.bundleID) == .mail,
@@ -748,7 +756,7 @@ final class Completer: ObservableObject {
             let trimmed = below.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty { quoted = trimmed }
         }
-        frozenContext = (key, title, text, quoted, Date())
+        frozenContext = (key, title, text, quoted, Date().addingTimeInterval(waitingForScreen ? 1 : 45))
         return (title, text, quoted)
     }
 

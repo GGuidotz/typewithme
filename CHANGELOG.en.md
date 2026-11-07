@@ -12,6 +12,9 @@ Longer, more sensible suggestions with the Cotypist model.
 - **Context like a real document.** With Gemma base the context is no longer a header of instructions: in Mail the subject and the message you are replying to, quoted with "> "; in chats the last messages, one per line. Only written text, no menus or buttons, and it stays fixed while you type in the same field.
 
 ### Improvements
+- **Keyboard always responsive.** The tap that intercepts Tab and Esc runs on its own thread and decides without waiting for the rest of the app: before, every key in every app waited for Type_w/Me's main thread, and a slow Accessibility read could freeze the whole Mac's keyboard. Accessibility queries now wait half a second at most.
+- **The pause follows your rhythm.** A continuation is requested after one and a half times your typical interval between keys (150 to 500 ms), never before the chosen pause: no more grey text flickering while you type, and far fewer field reads.
+- **Less memory on 8 GB Macs.** There "Keep the model ready" starts off: Gemma stops after the chosen minutes instead of staying in memory. Screen context is re-read at most every 15 seconds in the same window (immediately when you switch window).
 - **Better length.** A suggestion keeps going while the average per-token probability stays high, instead of multiplying word probabilities: with Italian words split into several pieces it almost always stopped after the first word.
 - **Clean prompt for base models.** Gemma base no longer gets English instructions, the clipboard or whole past texts in front of it, which confused it. The prompt only grows at the end and stays in the cache, so answers are faster.
 - **No repetition penalty.** It pushed the model away from common words and made suggestions sound unnatural.

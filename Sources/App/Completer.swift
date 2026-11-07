@@ -90,7 +90,7 @@ final class Completer: ObservableObject {
 
     private var field: FocusedField?
     private var context: TextContext?
-    private var suggestion: Suggestion?
+    private var suggestion: Suggestion? { didSet { syncTap() } }
     /// Il testo prima del cursore quando il suggerimento è nato, e quanto ne è stato accettato: per la memoria.
     private var origin = ""
     private var acceptedSoFar = ""
@@ -101,7 +101,10 @@ final class Completer: ObservableObject {
     /// (un testo lungo ci mette un po' ad arrivare all'app), e quante volte si è già riprovato.
     private var expectedTail: String?
     private var expectedRetries = 0
-    private var lastAcceptAt = Date.distantPast
+    private var lastAcceptAt = Date.distantPast { didSet { syncTap() } }
+    /// Gli ultimi intervalli tra un tasto e l'altro (sotto il secondo), in secondi: il tuo ritmo, per la pausa.
+    private var keyIntervals: [Double] = []
+    private var lastKeyTime: TimeInterval?
     private var requestTask: Task<Void, Never>?
     private var generation = 0
     /// Il suggerimento sullo schermo è ancora a metà: il modello lo sta scrivendo.
@@ -129,7 +132,11 @@ final class Completer: ObservableObject {
     // MARK: - Avvio
 
     func start() {
-        monitor.onKeyDown = { [unowned self] stroke in self.handle(stroke) }
+        // Una lettura Accessibilità che non risponde (un'app occupata) aspetterebbe 6 secondi, il predefinito di macOS,
+        // bloccando il thread principale: mezzo secondo al massimo per tutte le nostre domande. Chi chiede meno
+        // (WindowText, WebAccessibility, la domanda all'app in FocusReader) lo imposta sul suo elemento.
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.5)
+        monitor.onKeyDown = { [unowned self] stroke, action in self.handle(stroke, action: action) }
         monitor.onMouseDown = { [unowned self] in self.dismiss(reason: nil) }
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)
             .receive(on: RunLoop.main)
@@ -316,6 +323,25 @@ final class Completer: ObservableObject {
         else if requestTask != nil { new = .thinking }
         else { new = .ready }
         if new != status { status = new }
+        syncTap()
+    }
+
+    /// Copia nel tap della tastiera quello che gli serve per decidere da solo, sul suo thread, se un tasto è nostro
+    /// (KeyMonitor.swift, TapState).
+    private func syncTap() {
+        let enabled = prefs.enabled && monitor.isRunning
+        let text = suggestion?.text
+        let acceptWord = prefs.acceptWord, acceptAll = prefs.acceptAll, dismiss = prefs.dismiss, rewrite = prefs.rewrite
+        let accepted = lastAcceptAt
+        monitor.state.withLock { tap in
+            tap.enabled = enabled
+            tap.suggestion = text
+            tap.acceptWord = acceptWord
+            tap.acceptAll = acceptAll
+            tap.dismiss = dismiss
+            tap.rewrite = rewrite
+            tap.lastAcceptAt = accepted
+        }
     }
 
     private func appChanged() {
@@ -335,36 +361,49 @@ final class Completer: ObservableObject {
 
     // MARK: - Tasti
 
-    private func handle(_ s: KeyStroke) -> KeyDecision {
-        guard prefs.enabled, monitor.isRunning else { return .pass }
-        if prefs.rewrite.matches(keyCode: s.keyCode, flags: s.flags) {
+    /// Un tasto, dopo che il tap ha già deciso sul suo thread se tenerlo (`action` diverso da `.none`) o lasciarlo
+    /// passare. Qui si fa il lavoro: accettare, scartare, chiedere un seguito.
+    private func handle(_ s: KeyStroke, action: TapAction) {
+        guard prefs.enabled, monitor.isRunning else {
+            if action != .none { Self.resend(s) }
+            return
+        }
+        switch action {
+        case .rewrite:
             dismiss(reason: nil)
             onRewriteRequested?()
-            return .swallow
+            return
+        case .holdAfterAccept:
+            return
+        case .acceptWord, .acceptAll:
+            // Il suggerimento c'è ancora e il fuoco è nello stesso campo? Altrimenti il tasto, che il tap ha tenuto,
+            // torna all'app (succede se un tasto appena prima l'ha fatto sparire, o se il fuoco si è spostato).
+            guard suggestion != nil, let field, let now = FocusReader.focusedField(), CFEqual(now.element, field.element) else {
+                dismiss(reason: nil)
+                Self.resend(s)
+                return
+            }
+            // Prendi quello che c'è: se il modello stava ancora scrivendo, si ferma qui.
+            stopStreaming()
+            if action == .acceptWord { acceptWord() } else { acceptAll() }
+            return
+        case .dismiss:
+            // Come per Tab: se il suggerimento era già sparito, Esc torna all'app.
+            guard suggestion != nil else {
+                Self.resend(s)
+                return
+            }
+            stats.dismissed += 1
+            dismiss(reason: "dismissed")
+            return
+        case .none:
+            break
         }
         if KeyMonitor.secureInputActive {
             dismiss(reason: nil)
-            return .pass
+            return
         }
         if let suggestion {
-            let accept = prefs.acceptWord.matches(keyCode: s.keyCode, flags: s.flags)
-            let acceptEverything = prefs.acceptAll.matches(keyCode: s.keyCode, flags: s.flags)
-            if accept || acceptEverything {
-                // Il fuoco è ancora nello stesso campo? Altrimenti il tasto va all'app e il suggerimento sparisce.
-                guard let field, let now = FocusReader.focusedField(), CFEqual(now.element, field.element) else {
-                    dismiss(reason: nil)
-                    return .pass
-                }
-                // Prendi quello che c'è: se il modello stava ancora scrivendo, si ferma qui.
-                stopStreaming()
-                if accept { acceptWord() } else { acceptAll() }
-                return .swallow
-            }
-            if prefs.dismiss.matches(keyCode: s.keyCode, flags: s.flags) {
-                stats.dismissed += 1
-                dismiss(reason: "dismissed")
-                return .swallow
-            }
             if s.isPrintable, !s.characters.isEmpty, suggestion.text.hasPrefix(s.characters) {
                 // Stai scrivendo proprio quello che era suggerito: il suggerimento avanza.
                 stopStreaming()
@@ -377,26 +416,36 @@ final class Completer: ObservableObject {
                     self.suggestion = Suggestion(text: rest, source: suggestion.source)
                     reposition()
                 }
-                return .pass
+                return
             }
             dismiss(reason: nil)
         }
-        // Tab subito dopo un'accettazione, mentre arriva il seguito: non va all'app (sposterebbe il fuoco o scriverebbe
-        // una tabulazione), il seguito compare tra un attimo.
-        if Date().timeIntervalSince(lastAcceptAt) < 0.6,
-           prefs.acceptWord.matches(keyCode: s.keyCode, flags: s.flags) || prefs.acceptAll.matches(keyCode: s.keyCode, flags: s.flags) {
-            return .swallow
-        }
-        guard !s.hasCommandOrControl else { return .pass }
+        guard !s.hasCommandOrControl else { return }
         expectedTail = nil   // scrivi tu: niente più attesa del testo accettato
         if s.isPrintable {
+            noteRhythm(s.time)
             let wantsFix = prefs.italianCorrections || !prefs.abbreviations.isEmpty
             if wantsFix, Self.isBoundary(s.characters) { scheduleBoundaryFix(boundary: s.characters) }
             scheduleSuggestion()
         } else if s.isBackspace {
             scheduleSuggestion()
         }
-        return .pass
+    }
+
+    /// Un tasto che il tap aveva tenuto ma che non era per noi: lo si riscrive, con il nostro marchio (il tap lo lascia
+    /// passare).
+    private static func resend(_ s: KeyStroke) {
+        TextInserter.press(keyCode: CGKeyCode(s.keyCode), flags: s.flags.intersection(KeyBinding.relevantFlags))
+    }
+
+    /// L'intervallo dal tasto prima, se sei nel mezzo di una frase (sotto il secondo): gli ultimi 20 fanno il tuo ritmo.
+    private func noteRhythm(_ time: TimeInterval) {
+        defer { lastKeyTime = time }
+        guard let last = lastKeyTime else { return }
+        let gap = time - last
+        guard gap > 0, gap < 1 else { return }
+        keyIntervals.append(gap)
+        if keyIntervals.count > 20 { keyIntervals.removeFirst(keyIntervals.count - 20) }
     }
 
     private static func isBoundary(_ characters: String) -> Bool {
@@ -659,9 +708,20 @@ final class Completer: ObservableObject {
 
     /// A batteria, se la modalità batteria è accesa: pausa una volta e mezza (con una pausa fissa di 300 ms i
     /// suggerimenti sembravano lenti; il risparmio vero viene dallo schermo non letto e dal modello che si spegne).
+    /// Nessuna richiesta prima del tuo ritmo: non si chiede un seguito prima di una volta e mezza il tuo intervallo
+    /// tipico tra due tasti (la mediana degli ultimi 20), tra 150 e 500 ms. Con una pausa fissa più corta del ritmo di
+    /// scrittura si leggeva il campo e si chiedeva un seguito a quasi ogni tasto, e il testo grigio compariva e
+    /// spariva mentre scrivevi.
     private var effectiveDelay: Double {
-        guard prefs.batterySaver, Power.shouldSave else { return prefs.delay }
-        return prefs.delay * 1.5
+        let delay = max(prefs.delay, rhythmDelay)
+        guard prefs.batterySaver, Power.shouldSave else { return delay }
+        return delay * 1.5
+    }
+
+    private var rhythmDelay: Double {
+        guard keyIntervals.count >= 5 else { return 0.15 }
+        let median = keyIntervals.sorted()[keyIntervals.count / 2]
+        return min(0.5, max(0.15, median * 1.5))
     }
 
     /// Il contesto della finestra in cui scrivi: titolo e testo letti con Accessibilità (Contesto dall'app) e, se

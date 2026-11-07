@@ -12,6 +12,9 @@ Suggerimenti più lunghi e sensati con il modello di Cotypist.
 - **Contesto come in un documento vero.** Con Gemma base il contesto non è più un'intestazione di istruzioni: in Mail l'oggetto e il messaggio a cui rispondi, citato con "> "; in chat gli ultimi messaggi, una riga ciascuno. Solo righe di testo scritto, niente menu o pulsanti, e resta fermo mentre scrivi nello stesso campo.
 
 ### Miglioramenti
+- **Tastiera sempre pronta.** Il tap che intercetta Tab ed Esc gira su un thread suo e decide senza aspettare il resto dell'app: prima ogni tasto, in ogni app, attendeva il thread principale di Type_w/Me, e una lettura Accessibilità lenta poteva bloccare la tastiera di tutto il Mac. Le domande Accessibilità aspettano al massimo mezzo secondo.
+- **La pausa segue il tuo ritmo.** Un seguito si chiede dopo una volta e mezza il tuo intervallo tipico tra due tasti (tra 150 e 500 ms), mai prima della pausa scelta: niente più testo grigio che compare e sparisce mentre scrivi, e molte meno letture del campo.
+- **Meno memoria sui Mac da 8 GB.** Lì "Tieni il modello pronto" parte spento: Gemma si spegne dopo i minuti scelti invece di restare in memoria. Il contesto dallo schermo si rilegge al più ogni 15 secondi nella stessa finestra (subito se cambi finestra).
 - **Lunghezza decisa meglio.** Il suggerimento va avanti finché la probabilità media per token resta alta, invece di moltiplicare le probabilità delle parole: con le parole italiane spezzate in più pezzi ci si fermava quasi sempre alla prima.
 - **Prompt pulito per i modelli base.** Gemma base non riceve più istruzioni in inglese, appunti o testi tuoi interi davanti, che lo confondevano. Il prompt cresce solo in coda e resta nella cache, quindi le risposte sono più rapide.
 - **Niente penalità sulle ripetizioni.** Spingeva il modello lontano da "di", "che", "la" e rendeva il seguito innaturale.

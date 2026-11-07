@@ -84,8 +84,7 @@ enum FocusReader {
         markerFailure = nil
         func fail(_ step: String) -> FocusedField? { markerFailure = step; return nil }
         guard let selected = copy(focused, "AXSelectedTextMarkerRange") else { return fail("no selection marker") }
-        guard let caretStart = parameterized(focused, "AXStartTextMarkerForTextMarkerRange", selected),
-              let caretEnd = parameterized(focused, "AXEndTextMarkerForTextMarkerRange", selected)
+        guard let caretStart = startMarker(of: selected, in: focused), let caretEnd = endMarker(of: selected, in: focused)
         else { return fail("no caret marker") }
         // Il campo: l'antenato modificabile più alto dell'elemento con il fuoco o di quello sotto il cursore. In Mail il
         // fuoco sta sull'area web, che è tutta modificabile (il documento intero è la mail): allora il campo è lei.
@@ -97,10 +96,16 @@ enum FocusReader {
         // Solo in Mail: in una pagina web qualunque l'area web ha un cursore anche quando non si può scrivere.
         if field == nil, stringValue(focused, kAXRoleAttribute) == "AXWebArea", isMail(focused) { field = focused }
         guard let field else { return fail("no editable element") }
-        guard let whole = parameterized(field, "AXTextMarkerRangeForUIElement", field),
-              let fieldStart = parameterized(field, "AXStartTextMarkerForTextMarkerRange", whole),
-              let fieldEnd = parameterized(field, "AXEndTextMarkerForTextMarkerRange", whole)
-        else { return fail("no field range") }
+        // Inizio e fine del campo: dal suo intervallo, o dagli attributi di inizio e fine documento dell'area web.
+        var fieldStart: CFTypeRef?
+        var fieldEnd: CFTypeRef?
+        if let whole = parameterized(field, "AXTextMarkerRangeForUIElement", field) {
+            fieldStart = startMarker(of: whole, in: field)
+            fieldEnd = endMarker(of: whole, in: field)
+        }
+        if fieldStart == nil { fieldStart = copy(field, "AXStartTextMarker") }
+        if fieldEnd == nil { fieldEnd = copy(field, "AXEndTextMarker") }
+        guard let fieldStart, let fieldEnd else { return fail("no field range") }
         guard let before = markerString(field, from: fieldStart, to: caretStart) else { return fail("no text before") }
         let after = markerString(field, from: caretEnd, to: fieldEnd) ?? ""
         let selectedText = markerString(field, from: caretStart, to: caretEnd) ?? ""
@@ -132,8 +137,29 @@ enum FocusReader {
         return (copy(element, "AXEditable") as? NSNumber)?.boolValue == true
     }
 
+    /// L'inizio e la fine di un intervallo di marker: con le funzioni pubbliche di macOS (i marker sono tipi CF dal
+    /// macOS 12; WebKit recente non risponde più agli attributi "AXStart/EndTextMarkerForTextMarkerRange"), poi con
+    /// gli attributi per le versioni vecchie.
+    private static func startMarker(of range: CFTypeRef, in element: AXUIElement) -> CFTypeRef? {
+        if CFGetTypeID(range) == AXTextMarkerRangeGetTypeID() {
+            return AXTextMarkerRangeCopyStartMarker(range as! AXTextMarkerRange)
+        }
+        return parameterized(element, "AXStartTextMarkerForTextMarkerRange", range)
+    }
+
+    private static func endMarker(of range: CFTypeRef, in element: AXUIElement) -> CFTypeRef? {
+        if CFGetTypeID(range) == AXTextMarkerRangeGetTypeID() {
+            return AXTextMarkerRangeCopyEndMarker(range as! AXTextMarkerRange)
+        }
+        return parameterized(element, "AXEndTextMarkerForTextMarkerRange", range)
+    }
+
     private static func markerString(_ element: AXUIElement, from start: CFTypeRef, to end: CFTypeRef) -> String? {
-        guard let range = parameterized(element, "AXTextMarkerRangeForUnorderedTextMarkers", [start, end] as CFArray) else { return nil }
+        var range = parameterized(element, "AXTextMarkerRangeForUnorderedTextMarkers", [start, end] as CFArray)
+        if range == nil, CFGetTypeID(start) == AXTextMarkerGetTypeID(), CFGetTypeID(end) == AXTextMarkerGetTypeID() {
+            range = AXTextMarkerRangeCreate(kCFAllocatorDefault, start as! AXTextMarker, end as! AXTextMarker)
+        }
+        guard let range else { return nil }
         return parameterized(element, "AXStringForTextMarkerRange", range) as? String
     }
 

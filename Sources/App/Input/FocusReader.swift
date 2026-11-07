@@ -81,16 +81,27 @@ enum FocusReader {
     /// della mail, non il paragrafo), il testo prima e dopo il cursore si legge dall'inizio e fino alla fine del campo.
     /// nil se l'elemento non ha marker o non è modificabile.
     private static func markerField(_ focused: AXUIElement) -> FocusedField? {
-        guard let selected = copy(focused, "AXSelectedTextMarkerRange") else { return nil }
-        let root = elementValue(focused, "AXHighestEditableAncestor") ?? elementValue(focused, "AXEditableAncestor")
-        guard let field = root ?? (isEditable(focused) ? focused : nil),
-              let whole = parameterized(field, "AXTextMarkerRangeForUIElement", field),
+        markerFailure = nil
+        func fail(_ step: String) -> FocusedField? { markerFailure = step; return nil }
+        guard let selected = copy(focused, "AXSelectedTextMarkerRange") else { return fail("no selection marker") }
+        guard let caretStart = parameterized(focused, "AXStartTextMarkerForTextMarkerRange", selected),
+              let caretEnd = parameterized(focused, "AXEndTextMarkerForTextMarkerRange", selected)
+        else { return fail("no caret marker") }
+        // Il campo: l'antenato modificabile più alto dell'elemento con il fuoco o di quello sotto il cursore. In Mail il
+        // fuoco sta sull'area web, che è tutta modificabile (il documento intero è la mail): allora il campo è lei.
+        var field = editableRoot(focused)
+        if field == nil, let atCaret = parameterized(focused, "AXUIElementForTextMarker", caretStart),
+           CFGetTypeID(atCaret) == AXUIElementGetTypeID() {
+            field = editableRoot(atCaret as! AXUIElement)
+        }
+        // Solo in Mail: in una pagina web qualunque l'area web ha un cursore anche quando non si può scrivere.
+        if field == nil, stringValue(focused, kAXRoleAttribute) == "AXWebArea", isMail(focused) { field = focused }
+        guard let field else { return fail("no editable element") }
+        guard let whole = parameterized(field, "AXTextMarkerRangeForUIElement", field),
               let fieldStart = parameterized(field, "AXStartTextMarkerForTextMarkerRange", whole),
-              let fieldEnd = parameterized(field, "AXEndTextMarkerForTextMarkerRange", whole),
-              let caretStart = parameterized(field, "AXStartTextMarkerForTextMarkerRange", selected),
-              let caretEnd = parameterized(field, "AXEndTextMarkerForTextMarkerRange", selected)
-        else { return nil }
-        guard let before = markerString(field, from: fieldStart, to: caretStart) else { return nil }
+              let fieldEnd = parameterized(field, "AXEndTextMarkerForTextMarkerRange", whole)
+        else { return fail("no field range") }
+        guard let before = markerString(field, from: fieldStart, to: caretStart) else { return fail("no text before") }
         let after = markerString(field, from: caretEnd, to: fieldEnd) ?? ""
         let selectedText = markerString(field, from: caretStart, to: caretEnd) ?? ""
         let caret = before.utf16.count
@@ -98,6 +109,22 @@ enum FocusReader {
         let keptBefore = String(before.suffix(markerTextLimit))
         let keptAfter = String(after.prefix(markerTextLimit))
         return makeField(field, selection: selection, markerText: (keptBefore, keptAfter))
+    }
+
+    /// Il passo in cui l'ultima lettura con i marker si è fermata (per la diagnostica), nil se è andata.
+    nonisolated(unsafe) private(set) static var markerFailure: String?
+
+    private static func isMail(_ element: AXUIElement) -> Bool {
+        var pid: pid_t = 0
+        AXUIElementGetPid(element, &pid)
+        let id = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier ?? ""
+        return id == "com.apple.mail" || id.hasPrefix("com.apple.MailCompositionService")
+            || NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.mail"
+    }
+
+    private static func editableRoot(_ element: AXUIElement) -> AXUIElement? {
+        elementValue(element, "AXHighestEditableAncestor") ?? elementValue(element, "AXEditableAncestor")
+            ?? (isEditable(element) ? element : nil)
     }
 
     private static func isEditable(_ element: AXUIElement) -> Bool {
@@ -127,6 +154,7 @@ enum FocusReader {
         if copy(element, "AXSelectedTextMarkerRange") != nil { parts.append("marker") }
         if elementValue(element, "AXHighestEditableAncestor") != nil { parts.append("editable ancestor") }
         if isEditable(element) { parts.append("editable") }
+        if let failure = markerFailure { parts.append(failure) }
         return parts.joined(separator: ", ")
     }
 

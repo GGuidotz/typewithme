@@ -489,7 +489,11 @@ final class Completer: ObservableObject {
     private func produceSuggestion() {
         guard prefs.enabled, monitor.isRunning, !KeyMonitor.secureInputActive else { return }
         let readBegan = Date()
-        guard let field = FocusReader.focusedField() else { tally("no field", app: nil); return }
+        guard let field = FocusReader.focusedField() else {
+            // Che cosa espone l'elemento con il fuoco (ruolo e attributi, mai testo): dice perché il campo non si trova.
+            tally("no field (" + FocusReader.focusDescription() + ")", app: nil)
+            return
+        }
         guard !field.isSecure, field.selection.length == 0 else { return }
         guard !prefs.isExcluded(field.bundleID) else { return }
         if ignoreOwnProcess, field.pid == getpid() { return }

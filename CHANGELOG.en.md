@@ -3,6 +3,20 @@
 English notes, same format as CHANGELOG.md (the Italian one is the reference). The app uses these when its language
 is English; versions missing here fall back to the Italian notes.
 
+## 0.5.0 · 2026-11-07
+
+Gemma inside the app, a keyboard that never waits, and Mail.
+
+### New
+- **Gemma inside the app.** With a base model already on the Mac (like Cotypist's) Gemma runs inside Type_w/Me, with no server and no HTTP requests: the first piece of a suggestion arrives in 15-50 milliseconds instead of 90-120, and if you type exactly what the model predicted, the next suggestion is already there. Without the llama.cpp libraries, or with an instruction-tuned model, llama-server stays.
+
+### Improvements
+- **Keyboard always responsive.** The tap that intercepts Tab and Esc runs on its own thread and decides without waiting for the rest of the app: before, every key in every app waited for Type_w/Me's main thread, and a slow Accessibility read could freeze the whole Mac's keyboard. Accessibility queries now wait half a second at most.
+- **The pause follows your rhythm.** A continuation is requested after a little over half your typical interval between keys (60 to 250 ms), never before the chosen pause: not in the middle of a burst of keys, but right away when you stop.
+- **Mail, Safari and WebKit apps.** WebKit fields do not give text positions, only "text markers": the field, the text before and after the caret and the caret are now read that way too, and suggestions appear where the field used to be missing. If a field still is not found, diagnostics say what it exposes (role and attributes, never text).
+- **Screen context actually arrives.** When Accessibility gave only a scrap of the window, the context stayed frozen for 45 seconds with that scrap, and the text recognised on screen, which arrives a moment later, never reached the prompt. Now it comes in with the next request, and for base models the context in front of the text grows from 500 to 800 characters.
+- **Less memory on 8 GB Macs.** There "Keep the model ready" starts off: Gemma stops after the chosen minutes instead of staying in memory. Screen context is re-read at most every 15 seconds in the same window (immediately when you switch window).
+
 ## 0.4.0 · 2026-10-29
 
 Longer, more sensible suggestions with the Cotypist model.

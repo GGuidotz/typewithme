@@ -16,6 +16,14 @@ struct LlamaTimings: Equatable, Sendable {
     var predictedTokens: Int
     var predictedMs: Double
 
+    init(promptTokens: Int, cachedTokens: Int?, promptMs: Double, predictedTokens: Int, predictedMs: Double) {
+        self.promptTokens = promptTokens
+        self.cachedTokens = cachedTokens
+        self.promptMs = promptMs
+        self.predictedTokens = predictedTokens
+        self.predictedMs = predictedMs
+    }
+
     init?(_ chunk: [String: Any]) {
         guard let t = chunk["timings"] as? [String: Any] else { return nil }
         func number(_ key: String) -> Double? { (t[key] as? NSNumber)?.doubleValue }

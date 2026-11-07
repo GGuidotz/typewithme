@@ -86,7 +86,7 @@ enum Prompting {
     }
 
     /// Caratteri al massimo del contesto davanti al testo, per un modello base.
-    static let maxDocumentContext = 500
+    static let maxDocumentContext = 800
 
     enum AppKind { case mail, chat, other }
 

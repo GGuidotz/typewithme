@@ -18,6 +18,9 @@ struct FocusedField {
     let selection: CFRange
     /// Il rettangolo del campo, coordinate AX (origine in alto a sinistra).
     let frame: CGRect?
+    /// Campi WebKit (Mail, Safari, app con WKWebView) che non danno posizioni numeriche ma solo "text marker": il
+    /// testo prima e dopo il cursore letto una volta con i marker; la posizione del cursore è la lunghezza di `before`.
+    var markerText: (before: String, after: String)? = nil
 
     var caret: Int { selection.location }
 }
@@ -40,7 +43,21 @@ enum FocusReader {
                 selection = range
             }
         }
+        if selection == nil, let candidate = element ?? frontFocusedElement(), let marked = markerField(candidate) {
+            return marked
+        }
         guard let element, let selection else { return nil }
+        return makeField(element, selection: selection, markerText: nil)
+    }
+
+    private static func frontFocusedElement() -> AXUIElement? {
+        guard let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier != getpid() else { return nil }
+        let app = AXUIElementCreateApplication(front.processIdentifier)
+        AXUIElementSetMessagingTimeout(app, 0.1)
+        return elementValue(app, kAXFocusedUIElementAttribute)
+    }
+
+    private static func makeField(_ element: AXUIElement, selection: CFRange, markerText: (before: String, after: String)?) -> FocusedField {
         var pid: pid_t = 0
         AXUIElementGetPid(element, &pid)
         let app = NSRunningApplication(processIdentifier: pid)
@@ -52,7 +69,119 @@ enum FocusReader {
             frame = CGRect(origin: origin, size: size)
         }
         return FocusedField(element: element, pid: pid, bundleID: app?.bundleIdentifier ?? "", appName: app?.localizedName ?? "",
-                            role: role, isSecure: secure, selection: selection, frame: frame)
+                            role: role, isSecure: secure, selection: selection, frame: frame, markerText: markerText)
+    }
+
+    // MARK: - Campi WebKit (text marker)
+
+    /// Il testo che si legge con i marker, al massimo: oltre si tiene la parte vicina al cursore.
+    private static let markerTextLimit = 4000
+
+    /// Un campo modificabile WebKit letto con i text marker: il campo è l'antenato modificabile più alto (il corpo
+    /// della mail, non il paragrafo), il testo prima e dopo il cursore si legge dall'inizio e fino alla fine del campo.
+    /// nil se l'elemento non ha marker o non è modificabile.
+    private static func markerField(_ focused: AXUIElement) -> FocusedField? {
+        markerFailure = nil
+        func fail(_ step: String) -> FocusedField? { markerFailure = step; return nil }
+        guard let selected = copy(focused, "AXSelectedTextMarkerRange") else { return fail("no selection marker") }
+        guard let caretStart = startMarker(of: selected, in: focused), let caretEnd = endMarker(of: selected, in: focused)
+        else { return fail("no caret marker") }
+        // Il campo: l'antenato modificabile più alto dell'elemento con il fuoco o di quello sotto il cursore. In Mail il
+        // fuoco sta sull'area web, che è tutta modificabile (il documento intero è la mail): allora il campo è lei.
+        var field = editableRoot(focused)
+        if field == nil, let atCaret = parameterized(focused, "AXUIElementForTextMarker", caretStart),
+           CFGetTypeID(atCaret) == AXUIElementGetTypeID() {
+            field = editableRoot(atCaret as! AXUIElement)
+        }
+        // Solo in Mail: in una pagina web qualunque l'area web ha un cursore anche quando non si può scrivere.
+        if field == nil, stringValue(focused, kAXRoleAttribute) == "AXWebArea", isMail(focused) { field = focused }
+        guard let field else { return fail("no editable element") }
+        // Inizio e fine del campo: dal suo intervallo, o dagli attributi di inizio e fine documento dell'area web.
+        var fieldStart: CFTypeRef?
+        var fieldEnd: CFTypeRef?
+        if let whole = parameterized(field, "AXTextMarkerRangeForUIElement", field) {
+            fieldStart = startMarker(of: whole, in: field)
+            fieldEnd = endMarker(of: whole, in: field)
+        }
+        if fieldStart == nil { fieldStart = copy(field, "AXStartTextMarker") }
+        if fieldEnd == nil { fieldEnd = copy(field, "AXEndTextMarker") }
+        guard let fieldStart, let fieldEnd else { return fail("no field range") }
+        guard let before = markerString(field, from: fieldStart, to: caretStart) else { return fail("no text before") }
+        let after = markerString(field, from: caretEnd, to: fieldEnd) ?? ""
+        let selectedText = markerString(field, from: caretStart, to: caretEnd) ?? ""
+        let caret = before.utf16.count
+        let selection = CFRange(location: caret, length: selectedText.utf16.count)
+        let keptBefore = String(before.suffix(markerTextLimit))
+        let keptAfter = String(after.prefix(markerTextLimit))
+        return makeField(field, selection: selection, markerText: (keptBefore, keptAfter))
+    }
+
+    /// Il passo in cui l'ultima lettura con i marker si è fermata (per la diagnostica), nil se è andata.
+    nonisolated(unsafe) private(set) static var markerFailure: String?
+
+    private static func isMail(_ element: AXUIElement) -> Bool {
+        var pid: pid_t = 0
+        AXUIElementGetPid(element, &pid)
+        let id = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier ?? ""
+        return id == "com.apple.mail" || id.hasPrefix("com.apple.MailCompositionService")
+            || NSWorkspace.shared.frontmostApplication?.bundleIdentifier == "com.apple.mail"
+    }
+
+    private static func editableRoot(_ element: AXUIElement) -> AXUIElement? {
+        elementValue(element, "AXHighestEditableAncestor") ?? elementValue(element, "AXEditableAncestor")
+            ?? (isEditable(element) ? element : nil)
+    }
+
+    private static func isEditable(_ element: AXUIElement) -> Bool {
+        if let role = stringValue(element, kAXRoleAttribute), role == kAXTextAreaRole || role == kAXTextFieldRole { return true }
+        return (copy(element, "AXEditable") as? NSNumber)?.boolValue == true
+    }
+
+    /// L'inizio e la fine di un intervallo di marker: con le funzioni pubbliche di macOS (i marker sono tipi CF dal
+    /// macOS 12; WebKit recente non risponde più agli attributi "AXStart/EndTextMarkerForTextMarkerRange"), poi con
+    /// gli attributi per le versioni vecchie.
+    private static func startMarker(of range: CFTypeRef, in element: AXUIElement) -> CFTypeRef? {
+        if CFGetTypeID(range) == AXTextMarkerRangeGetTypeID() {
+            return AXTextMarkerRangeCopyStartMarker(range as! AXTextMarkerRange)
+        }
+        return parameterized(element, "AXStartTextMarkerForTextMarkerRange", range)
+    }
+
+    private static func endMarker(of range: CFTypeRef, in element: AXUIElement) -> CFTypeRef? {
+        if CFGetTypeID(range) == AXTextMarkerRangeGetTypeID() {
+            return AXTextMarkerRangeCopyEndMarker(range as! AXTextMarkerRange)
+        }
+        return parameterized(element, "AXEndTextMarkerForTextMarkerRange", range)
+    }
+
+    private static func markerString(_ element: AXUIElement, from start: CFTypeRef, to end: CFTypeRef) -> String? {
+        var range = parameterized(element, "AXTextMarkerRangeForUnorderedTextMarkers", [start, end] as CFArray)
+        if range == nil, CFGetTypeID(start) == AXTextMarkerGetTypeID(), CFGetTypeID(end) == AXTextMarkerGetTypeID() {
+            range = AXTextMarkerRangeCreate(kCFAllocatorDefault, start as! AXTextMarker, end as! AXTextMarker)
+        }
+        guard let range else { return nil }
+        return parameterized(element, "AXStringForTextMarkerRange", range) as? String
+    }
+
+    private static func parameterized(_ element: AXUIElement, _ attribute: String, _ parameter: CFTypeRef) -> CFTypeRef? {
+        var out: CFTypeRef?
+        guard AXUIElementCopyParameterizedAttributeValue(element, attribute as CFString, parameter, &out) == .success else { return nil }
+        return out
+    }
+
+    /// Che cosa espone l'elemento con il fuoco quando il campo non si trova, per la diagnostica: ruolo e attributi
+    /// presenti, mai testo. "none" se nessun elemento ha il fuoco.
+    static func focusDescription() -> String {
+        let system = AXUIElementCreateSystemWide()
+        guard let element = elementValue(system, kAXFocusedUIElementAttribute) ?? frontFocusedElement() else { return "none" }
+        let role = stringValue(element, kAXRoleAttribute) ?? "?"
+        var parts = [role]
+        if copy(element, kAXSelectedTextRangeAttribute) != nil { parts.append("range") }
+        if copy(element, "AXSelectedTextMarkerRange") != nil { parts.append("marker") }
+        if elementValue(element, "AXHighestEditableAncestor") != nil { parts.append("editable ancestor") }
+        if isEditable(element) { parts.append("editable") }
+        if let failure = markerFailure { parts.append(failure) }
+        return parts.joined(separator: ", ")
     }
 
     /// L'app in primo piano, per il menu e le esclusioni.
@@ -65,6 +194,7 @@ enum FocusReader {
 
     /// Gli ultimi `max` caratteri prima del cursore.
     static func text(before field: FocusedField, max: Int) -> String? {
+        if let marked = field.markerText { return String(marked.before.suffix(max)) }
         let caret = field.caret
         let start = Swift.max(0, caret - max)
         let range = CFRange(location: start, length: caret - start)
@@ -80,6 +210,10 @@ enum FocusReader {
     static func text(after field: FocusedField, max: Int, wholeLines: Bool = false) -> String? {
         let end = field.selection.location + field.selection.length
         var raw: String?
+        if let marked = field.markerText {
+            let piece = String(marked.after.prefix(max))
+            return wholeLines ? piece : (piece.components(separatedBy: .newlines).first ?? piece)
+        }
         if let total = intValue(field.element, kAXNumberOfCharactersAttribute) {
             let length = Swift.min(max, total - end)
             if length <= 0 { return "" }

@@ -142,7 +142,9 @@ final class Preferences: ObservableObject {
         appInstructions = load("appInstructions", [String: String]())
         selectedModelID = d.string(forKey: "selectedModelID") ?? ModelCatalog.defaultID
         customModels = load("customModels", [ModelEntry]())
-        keepModelLoaded = d.object(forKey: "keepModelLoaded") as? Bool ?? true
+        // Con 8 GB o meno il modello sempre in memoria (pesi, cache, memoria della GPU: oltre un GB) manda il Mac a usare
+        // lo swap: lì si spegne dopo i minuti scelti, a meno che non lo chieda chi usa l'app.
+        keepModelLoaded = d.object(forKey: "keepModelLoaded") as? Bool ?? (ProcessInfo.processInfo.physicalMemory > 8 << 30)
         llamaIdleMinutes = d.object(forKey: "llamaIdleMinutes") as? Double ?? 10
         useOllama = d.object(forKey: "useOllama") as? Bool ?? true
         llamaServerPath = d.string(forKey: "llamaServerPath")

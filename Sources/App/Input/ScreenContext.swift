@@ -11,9 +11,11 @@ import Vision
 
 @MainActor
 final class ScreenContext {
-    /// Quanto vale un testo riconosciuto, e la distanza minima tra due aggiornamenti.
-    private static let maxAge: TimeInterval = 20
-    private static let minInterval: TimeInterval = 4
+    /// Quanto vale un testo riconosciuto, e la distanza minima tra due aggiornamenti. Una finestra nuova (o un'altra
+    /// app) si legge subito; la stessa finestra si rilegge di rado: cattura e OCR costano, e mentre scrivi nello stesso
+    /// campo il contesto resta comunque fermo (Completer.windowContext).
+    private static let maxAge: TimeInterval = 60
+    private static let minInterval: TimeInterval = 15
     private nonisolated static let maxPixels: CGFloat = 2000
     private nonisolated static let maxCharacters = 1_500
 
@@ -27,9 +29,14 @@ final class ScreenContext {
     private var snapshot: Snapshot?
     private var task: Task<Void, Never>?
     private var lastStart: Date?
+    /// La finestra dell'ultimo aggiornamento partito: la distanza minima vale solo per lei.
+    private var lastTarget: (pid: pid_t, windowID: CGWindowID?)?
 
     /// Quante catture sono riuscite e quanto è durata l'ultima (cattura e OCR), per la diagnostica.
     private(set) var captures = 0
+
+    /// Vero mentre una cattura con OCR è in corso: il testo arriverà tra poco.
+    var isRefreshing: Bool { task != nil }
     private(set) var lastDurationMs: Int?
 
     // MARK: - Permesso
@@ -52,7 +59,7 @@ final class ScreenContext {
             if age < Self.maxAge { result = s.text }
             fresh = age < Self.maxAge
         }
-        if !fresh { refresh(pid: pid) }
+        if !fresh { refresh(pid: pid, windowID: windowID) }
         return result
     }
 
@@ -65,10 +72,12 @@ final class ScreenContext {
 
     // MARK: - Aggiornamento
 
-    private func refresh(pid: pid_t) {
+    private func refresh(pid: pid_t, windowID: CGWindowID?) {
         guard task == nil else { return }
-        if let last = lastStart, Date().timeIntervalSince(last) < Self.minInterval { return }
+        if let last = lastStart, let target = lastTarget, target.pid == pid, target.windowID == windowID,
+           Date().timeIntervalSince(last) < Self.minInterval { return }
         lastStart = Date()
+        lastTarget = (pid, windowID)
         task = Task { [weak self] in
             let started = Date()
             let outcome = await Self.capture(pid: pid)

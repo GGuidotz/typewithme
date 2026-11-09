@@ -19,11 +19,12 @@ cask "typewithme" do
 
   app "TypeWithMe.app"
 
-  postflight do
+  postflight_steps do
     # Niente account Apple Developer, quindi l'app non è notarizzata: togliere la quarantena evita "Apri comunque".
-    system_command "/usr/bin/xattr",
-                   args:         ["-dr", "com.apple.quarantine", "#{appdir}/TypeWithMe.app"],
-                   must_succeed: false
+    run "/usr/bin/xattr",
+        args:           ["-dr", "com.apple.quarantine", "{{appdir}}/TypeWithMe.app"],
+        writable_paths: ["{{appdir}}/TypeWithMe.app"],
+        must_succeed:   false
   end
 
   uninstall quit: "com.gguidotz.typewithme"

@@ -3,7 +3,8 @@
 // volta (-hf: nella cache di llama.cpp, ~/Library/Caches/llama.cpp), si spegne dopo qualche minuto senza richieste e
 // quando l'app si chiude. Se Ollama è aperto e ha già il modello, si usa lui e non si avvia niente.
 // Il registro del processo resta in memoria, corto e senza percorsi: serve solo alla diagnostica.
-// Il server vuole una chiave casuale (--api-key) nuova a ogni avvio, tenuta solo in memoria: le richieste a Ollama no.
+// Il server vuole una chiave casuale nuova a ogni avvio (LLAMA_API_KEY, l'equivalente di --api-key), tenuta solo in
+// memoria: le richieste a Ollama no.
 
 import Combine
 import Foundation
@@ -319,14 +320,19 @@ final class LlamaServer: ObservableObject {
         apiKey = key
         // Da verificare sul Mac con la versione di Homebrew: --no-webui e --cache-reuse ci sono nelle versioni del
         // 2025; se llama-server li rifiuta, il tentativo dopo parte senza.
-        // --api-key resta in ogni tentativo; --no-slots (niente /slots, che mostrerebbe il prompt) è tra gli opzionali.
-        var arguments = ["--host", "127.0.0.1", "--port", "\(port)", "--api-key", key] + source + ["-c", "2048", "-ngl", "99"]
+        // La chiave va nell'ambiente (LLAMA_API_KEY) e non tra gli argomenti: gli argomenti di un processo si leggono con
+        // `ps` anche da altri utenti del Mac. Vale in ogni tentativo; --no-slots (niente /slots, che mostrerebbe il
+        // prompt) è tra gli opzionali.
+        var arguments = ["--host", "127.0.0.1", "--port", "\(port)"] + source + ["-c", "2048", "-ngl", "99"]
         // Un solo slot: ogni richiesta trova la cache del prompt di quella prima. --swa-full: Gemma 3 usa
         // l'attenzione a finestra scorrevole e senza una cache piena llama.cpp rifà tutto il prompt a ogni richiesta.
         if !minimalArguments { arguments += ["--no-webui", "--no-slots", "--cache-reuse", "256", "-np", "1", "--swa-full"] }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: path)
         p.arguments = arguments
+        var environment = ProcessInfo.processInfo.environment
+        environment["LLAMA_API_KEY"] = key
+        p.environment = environment
         p.standardInput = FileHandle.nullDevice
         let pipe = Pipe()
         p.standardOutput = pipe

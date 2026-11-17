@@ -58,6 +58,8 @@ if [ "${TYPEWITHME_LLAMA:-}" != none ]; then
       | tr -d '[:space:]') || true
   fi
   LLAMA_CACHE="$BUILD/llama-cache/$LLAMA_TAG"
+  # Cache di una build precedente alla 0.5.6, senza impronta: la si riscarica per poterla verificare.
+  [ -n "$LLAMA_TAG" ] && [ -d "$LLAMA_CACHE" ] && [ ! -f "$LLAMA_CACHE/.archive-sha256" ] && rm -rf "$LLAMA_CACHE"
   if [ -n "$LLAMA_TAG" ] && [ ! -x "$LLAMA_CACHE/llama-server" ]; then
     mkdir -p "$BUILD/llama-cache"
     BASE="https://github.com/ggml-org/llama.cpp/releases/download/$LLAMA_TAG/llama-$LLAMA_TAG-bin-macos-arm64"

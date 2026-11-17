@@ -108,7 +108,8 @@ cd typewithme
 ```
 
 `packaging/llama.cpp-version` decide la release di llama.cpp inclusa nell'app: `latest` è l'ultima, un tag come `b6500`
-la fissa. `TYPEWITHME_LLAMA=none ./build.sh` salta llama.cpp (poi serve quello di Homebrew).
+la fissa. Una seconda riga facoltativa, `sha256 <hash>`, è l'impronta dell'archivio: se non coincide la build si ferma; se manca,
+la build locale avvisa e `--dmg` si ferma. `TYPEWITHME_LLAMA=none ./build.sh` salta llama.cpp (poi serve quello di Homebrew).
 
 ## Feedback
 

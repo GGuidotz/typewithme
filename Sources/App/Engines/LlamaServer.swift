@@ -3,9 +3,11 @@
 // volta (-hf: nella cache di llama.cpp, ~/Library/Caches/llama.cpp), si spegne dopo qualche minuto senza richieste e
 // quando l'app si chiude. Se Ollama è aperto e ha già il modello, si usa lui e non si avvia niente.
 // Il registro del processo resta in memoria, corto e senza percorsi: serve solo alla diagnostica.
+// Il server vuole una chiave casuale (--api-key) nuova a ogni avvio, tenuta solo in memoria: le richieste a Ollama no.
 
 import Combine
 import Foundation
+import Security
 
 @MainActor
 final class LlamaServer: ObservableObject {
@@ -65,6 +67,8 @@ final class LlamaServer: ObservableObject {
     private var currentEntry: ModelEntry?
     private var attempts = 0
     private var minimalArguments = false
+    /// La chiave di questo avvio di llama-server (--api-key): nuova a ogni tentativo, solo in memoria, mai nel registro.
+    private var apiKey: String?
     private var launchedAt = Date.distantPast
     private var failedAt = Date.distantPast
     private var lastUse = Date()
@@ -227,6 +231,7 @@ final class LlamaServer: ObservableObject {
         }
         engine = nil
         backend = nil
+        apiKey = nil
         if state != .stopped { state = .stopped }
     }
 
@@ -306,12 +311,19 @@ final class LlamaServer: ObservableObject {
         }
         let port = Self.freePort()
         let cached = Self.isCached(entry)
+        // Solo chi conosce la chiave parla con questo llama-server: altri processi o utenti del Mac ricevono 401.
+        guard let key = Self.makeAPIKey() else {
+            fail(L("llama.cpp non si avvia: %@", "chiave casuale non disponibile"))
+            return
+        }
+        apiKey = key
         // Da verificare sul Mac con la versione di Homebrew: --no-webui e --cache-reuse ci sono nelle versioni del
         // 2025; se llama-server li rifiuta, il tentativo dopo parte senza.
-        var arguments = ["--host", "127.0.0.1", "--port", "\(port)"] + source + ["-c", "2048", "-ngl", "99"]
+        // --api-key resta in ogni tentativo; --no-slots (niente /slots, che mostrerebbe il prompt) è tra gli opzionali.
+        var arguments = ["--host", "127.0.0.1", "--port", "\(port)", "--api-key", key] + source + ["-c", "2048", "-ngl", "99"]
         // Un solo slot: ogni richiesta trova la cache del prompt di quella prima. --swa-full: Gemma 3 usa
         // l'attenzione a finestra scorrevole e senza una cache piena llama.cpp rifà tutto il prompt a ogni richiesta.
-        if !minimalArguments { arguments += ["--no-webui", "--cache-reuse", "256", "-np", "1", "--swa-full"] }
+        if !minimalArguments { arguments += ["--no-webui", "--no-slots", "--cache-reuse", "256", "-np", "1", "--swa-full"] }
         let p = Process()
         p.executableURL = URL(fileURLWithPath: path)
         p.arguments = arguments
@@ -359,7 +371,7 @@ final class LlamaServer: ObservableObject {
         healthTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(500))
-                let healthy = await LocalHTTP.isOK(url, timeout: 2)
+                let healthy = await LocalHTTP.isOK(url, timeout: 2, apiKey: self?.apiKey)
                 guard let self, !Task.isCancelled, self.process?.processIdentifier == pid else { return }
                 if healthy {
                     self.becameReady(port: port, entry: entry)
@@ -380,7 +392,8 @@ final class LlamaServer: ObservableObject {
     private func becameReady(port: Int, entry: ModelEntry) {
         guard let base = URL(string: "http://127.0.0.1:\(port)") else { return }
         backend = .llamaServer
-        engine = LlamaEngine(baseURL: base, model: entry.id, displayName: entry.title, rawCompletion: entry.usesRawCompletion)
+        engine = LlamaEngine(baseURL: base, model: entry.id, displayName: entry.title, rawCompletion: entry.usesRawCompletion,
+                           apiKey: apiKey)
         state = .ready
         lastLogLine = nil
         scheduleIdleTimer()
@@ -457,7 +470,8 @@ final class LlamaServer: ObservableObject {
         // Dopo l'avvio contano solo gli errori: le righe delle richieste non servono e non si tengono.
         let collecting = state != .ready
         for raw in parts {
-            let line = Self.sanitized(raw)
+            var line = Self.sanitized(raw)
+            if let key = apiKey { line = line.replacingOccurrences(of: key, with: "…") }
             guard !line.isEmpty else { continue }
             let lower = line.lowercased()
             let isError = lower.contains("error") || lower.contains("failed")
@@ -478,6 +492,13 @@ final class LlamaServer: ObservableObject {
     }
 
     // MARK: - Pezzi
+
+    /// 32 byte casuali del sistema, in esadecimale (64 caratteri); nil se SecRandomCopyBytes fallisce.
+    static func makeAPIKey() -> String? {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        guard SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) == errSecSuccess else { return nil }
+        return bytes.map { String(format: "%02x", $0) }.joined()
+    }
 
     /// Una porta libera tra 49152 e 65535: si prova a occuparla con un socket e la si lascia subito.
     static func freePort() -> Int {

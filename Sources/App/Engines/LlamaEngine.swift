@@ -56,6 +56,9 @@ final class LlamaEngine: CompletionEngine, @unchecked Sendable {
     let model: String
     /// Modello base: continuazione pura via /completion (solo con il nostro llama-server).
     let rawCompletion: Bool
+    /// La chiave del nostro llama-server (header Authorization: Bearer). nil con Ollama, che non la vuole. Solo in
+    /// memoria, mai nella diagnostica.
+    private let apiKey: String?
 
     var unavailableReason: String? { nil }
 
@@ -71,7 +74,8 @@ final class LlamaEngine: CompletionEngine, @unchecked Sendable {
         lock.withLock { timings = t }
     }
 
-    init(baseURL: URL, model: String, displayName: String, rawCompletion: Bool = false) {
+    init(baseURL: URL, model: String, displayName: String, rawCompletion: Bool = false, apiKey: String? = nil) {
+        self.apiKey = apiKey
         self.baseURL = baseURL
         self.model = model
         self.displayName = displayName
@@ -128,6 +132,7 @@ final class LlamaEngine: CompletionEngine, @unchecked Sendable {
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.timeoutInterval = 10
         urlRequest.httpBody = (try? JSONSerialization.data(withJSONObject: object)) ?? Data()
+        LocalHTTP.authorize(&urlRequest, apiKey: apiKey)
         let (bytes, response) = try await LocalHTTP.session.bytes(for: urlRequest)
         try Self.check(response)
         var stop = ConfidenceStop(length: request.length, maxWords: request.maxWords, strictness: request.strictness)
@@ -193,6 +198,7 @@ final class LlamaEngine: CompletionEngine, @unchecked Sendable {
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.timeoutInterval = 5
         urlRequest.httpBody = (try? JSONSerialization.data(withJSONObject: object)) ?? Data()
+        LocalHTTP.authorize(&urlRequest, apiKey: apiKey)
         let (data, response) = try await LocalHTTP.session.data(for: urlRequest)
         try Self.check(response)
         guard let chunk = Self.parse(String(decoding: data, as: UTF8.self)) else { return nil }
@@ -268,6 +274,7 @@ final class LlamaEngine: CompletionEngine, @unchecked Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 10
         request.httpBody = body
+        LocalHTTP.authorize(&request, apiKey: apiKey)
         return request
     }
 
@@ -329,10 +336,17 @@ enum LocalHTTP {
         return URLSession(configuration: configuration)
     }()
 
+    /// Aggiunge l'header della chiave del nostro llama-server, se c'è.
+    static func authorize(_ request: inout URLRequest, apiKey: String?) {
+        guard let apiKey, !apiKey.isEmpty else { return }
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+    }
+
     /// Vero se GET `url` risponde 200 entro `timeout` secondi.
-    static func isOK(_ url: URL, timeout: TimeInterval = 2) async -> Bool {
+    static func isOK(_ url: URL, timeout: TimeInterval = 2, apiKey: String? = nil) async -> Bool {
         var request = URLRequest(url: url)
         request.timeoutInterval = timeout
+        authorize(&request, apiKey: apiKey)
         guard let result = try? await session.data(for: request) else { return false }
         return (result.1 as? HTTPURLResponse)?.statusCode == 200
     }

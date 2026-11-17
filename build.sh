@@ -48,7 +48,10 @@ cp CHANGELOG.md "$APP/Contents/Resources/CHANGELOG.md"   # Impostazioni › Aggi
 # TYPEWITHME_LLAMA=none ./build.sh … salta questo passo.
 LLAMA_TAG=""
 if [ "${TYPEWITHME_LLAMA:-}" != none ]; then
-  LLAMA_TAG=$(tr -d '[:space:]' < packaging/llama.cpp-version 2>/dev/null || echo latest)
+  # Riga 1: il tag. Riga 2 facoltativa: "sha256 <hash>" dell'archivio tar.gz (vedi sotto).
+  LLAMA_TAG=$(head -n 1 packaging/llama.cpp-version 2>/dev/null | tr -d '[:space:]' || true)
+  [ -n "$LLAMA_TAG" ] || LLAMA_TAG=latest
+  LLAMA_SHA256=$(sed -n 2p packaging/llama.cpp-version 2>/dev/null | awk 'tolower($1) == "sha256" { print tolower($2) }' || true)
   if [ -z "$LLAMA_TAG" ] || [ "$LLAMA_TAG" = latest ]; then
     # Le release "vX.Y.Z" di llama.cpp non hanno i binari: il file nightly-tag.txt dice la build "bNNNN" che li ha.
     LLAMA_TAG=$(curl -fsSL https://github.com/ggml-org/llama.cpp/releases/latest/download/nightly-tag.txt 2>/dev/null \
@@ -64,6 +67,7 @@ if [ "${TYPEWITHME_LLAMA:-}" != none ]; then
       if curl -fsSL -o "$BUILD/llama-cache/llama.$ext" "$BASE.$ext"; then ARCHIVE="$BUILD/llama-cache/llama.$ext"; break; fi
     done
     if [ -n "$ARCHIVE" ]; then
+      ARCHIVE_SHA256=$(shasum -a 256 "$ARCHIVE" | awk '{ print $1 }')
       UNZIP=$(mktemp -d)
       case "$ARCHIVE" in
         *.zip) unzip -q "$ARCHIVE" -d "$UNZIP" ;;
@@ -72,6 +76,7 @@ if [ "${TYPEWITHME_LLAMA:-}" != none ]; then
       SERVER=$(find "$UNZIP" -type f -name llama-server | head -n 1)
       if [ -n "$SERVER" ]; then
         rm -rf "$LLAMA_CACHE"; mkdir -p "$LLAMA_CACHE"
+        echo "$ARCHIVE_SHA256" > "$LLAMA_CACHE/.archive-sha256"   # l'impronta dell'archivio scaricato, per il controllo qui sotto
         cp "$SERVER" "$LLAMA_CACHE/"
         # Le librerie possono stare accanto all'eseguibile o in una cartella lib: tutte nella stessa cartella.
         find "$UNZIP" -name '*.dylib' -exec cp -P {} "$LLAMA_CACHE/" \;
@@ -83,12 +88,34 @@ if [ "${TYPEWITHME_LLAMA:-}" != none ]; then
       rm -rf "$UNZIP" "$ARCHIVE"
     fi
   fi
+  # Integrità: l'archivio finisce dentro l'app firmata. Con "sha256 <hash>" nella seconda riga di
+  # packaging/llama.cpp-version una differenza ferma la build; senza, la build locale avvisa e --dmg si ferma.
+  if [ -n "$LLAMA_TAG" ] && [ -x "$LLAMA_CACHE/llama-server" ]; then
+    ACTUAL_SHA256=$(cat "$LLAMA_CACHE/.archive-sha256" 2>/dev/null || true)
+    if [ -n "$LLAMA_SHA256" ]; then
+      if [ "$ACTUAL_SHA256" != "$LLAMA_SHA256" ]; then
+        echo "L'archivio di llama.cpp $LLAMA_TAG non coincide con l'impronta in packaging/llama.cpp-version." >&2
+        echo "  scritta:   $LLAMA_SHA256" >&2
+        echo "  calcolata: ${ACTUAL_SHA256:-sconosciuta (cartella build/llama-cache di una build precedente: cancellala)}" >&2
+        rm -rf "$LLAMA_CACHE"
+        exit 1
+      fi
+    elif [ -n "$ACTUAL_SHA256" ]; then
+      echo "Attenzione: l'archivio di llama.cpp $LLAMA_TAG non è verificato. Impronta calcolata: $ACTUAL_SHA256" >&2
+      echo "  Aggiungilo a packaging/llama.cpp-version come seconda riga: sha256 $ACTUAL_SHA256" >&2
+      [ "$MODE" = dmg ] && { echo "Il DMG di rilascio richiede l'impronta: build fermata." >&2; exit 1; }
+    else
+      echo "Attenzione: l'archivio di llama.cpp $LLAMA_TAG non è verificato (impronta sconosciuta: cancella build/llama-cache e riprova)." >&2
+      [ "$MODE" = dmg ] && { echo "Il DMG di rilascio richiede l'impronta: build fermata." >&2; exit 1; }
+    fi
+  fi
   if [ -n "$LLAMA_TAG" ] && [ -x "$LLAMA_CACHE/llama-server" ]; then
     mkdir -p "$APP/Contents/Helpers/llama"
     # In Helpers solo codice firmato: un file di testo lì fa fallire la firma dell'app. La licenza va in Resources.
     for f in "$LLAMA_CACHE"/*; do
       case "$f" in
         */LICENSE*) cp "$f" "$APP/Contents/Resources/LICENSE-llama.cpp" ;;
+        */.archive-sha256) ;;
         *) cp -P "$f" "$APP/Contents/Helpers/llama/" ;;
       esac
     done
@@ -188,26 +215,34 @@ plist_set SGRIconTier "$ICON_TIER"
 plutil -lint "$PLIST" >/dev/null
 xattr -cr "$APP"
 KC="$HOME/.nod-signing/nod-signing.keychain"
-# Prima il codice annidato (llama-server e le sue librerie), poi l'app: stessa identità per tutto.
+# Prima il codice annidato (llama-server e le sue librerie), poi l'app: stessa identità per tutto, tutto con hardened
+# runtime (--options runtime: macOS ignora DYLD_INSERT_LIBRARIES e altri processi non iniettano codice nell'app).
 sign() {
-  if [ -f "$KC" ]; then codesign --force --keychain "$KC" --sign "Nod Local Signing" "$@"
-  else codesign --force --sign - "$@"; fi
+  if [ -f "$KC" ]; then codesign --force --options runtime --keychain "$KC" --sign "Nod Local Signing" "$@"
+  else codesign --force --options runtime --sign - "$@"; fi
 }
 [ -f "$KC" ] && security unlock-keychain -p nod "$KC"
 if [ -d "$APP/Contents/Helpers/llama" ]; then
-  for f in "$APP"/Contents/Helpers/llama/*.dylib(N) "$APP/Contents/Helpers/llama/llama-server"; do
+  for f in "$APP"/Contents/Helpers/llama/*.dylib(N); do
     [ -L "$f" ] || sign "$f"
   done
+  [ -f "$APP/Contents/Helpers/llama/llama-server" ] && sign --entitlements Resources/llama-server.entitlements "$APP/Contents/Helpers/llama/llama-server"
 fi
 if [ -f "$KC" ]; then
   SIGNING=local
-  sign "$APP"
+  sign --entitlements Resources/TypeWithMe.entitlements "$APP"
 else
   SIGNING=adhoc
-  sign "$APP"
+  sign --entitlements Resources/TypeWithMe.entitlements "$APP"
   echo "Attenzione: firma ad hoc. A ogni build macOS dimentica Accessibilità e Monitoraggio input (vedi make-signing-identity.sh di Nod)."
 fi
 codesign --verify --strict "$APP"
+# L'hardened runtime deve esserci davvero (app e llama-server), altrimenti la firma non protegge dall'iniezione di codice.
+codesign -dv "$APP" 2>&1 | grep -q 'flags=.*runtime' || { echo "Manca l'hardened runtime nella firma dell'app." >&2; exit 1; }
+if [ -f "$APP/Contents/Helpers/llama/llama-server" ]; then
+  codesign -dv "$APP/Contents/Helpers/llama/llama-server" 2>&1 | grep -q 'flags=.*runtime' \
+    || { echo "Manca l'hardened runtime nella firma di llama-server." >&2; exit 1; }
+fi
 echo "Pronto: $APP ($VERSION, build $BUILD_NUMBER, commit $COMMIT, firma $SIGNING, icona $ICON_TIER${ICON_CHECK:+: $ICON_CHECK}, llama.cpp ${LLAMA_TAG:-da Homebrew}, Gemma dentro l'app: $INPROCESS)"
 
 case "$MODE" in

@@ -50,3 +50,4 @@ app: testo grigio dopo il cursore, Tab per accettare. Tutto sul Mac. Stesso sche
   `Sources/App/Input/UnderlineOverlay.swift`), sinonimi (`Sources/App/Synonyms.swift`), soglie per app imparate da
   quello che accetti (`Sources/Core/AppAdaptation.swift`, `ConfidenceStop.strictness`). Scorciatoie nel tap
   (`TapState.proofread`, `TapState.synonyms`).
+- Dalla 0.5.6: firma con hardened runtime ed entitlement in `Resources/TypeWithMe.entitlements` (e `llama-server.entitlements`), da aggiornare se l'app usa una risorsa nuova; llama-server si avvia con `--api-key` casuale per avvio (solo in memoria, header Bearer in `LlamaEngine`, mai Ollama); la seconda riga di `packaging/llama.cpp-version` (`sha256 <hash>`) è verificata da build.sh (obbligatoria per `--dmg`); memoria delle frasi cifrata (`PhraseSealing`, chiave di `TypingHistory`), cartella Application Support 0700 e file 0600 (`Sources/Core/SupportFiles.swift`).

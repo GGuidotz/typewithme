@@ -3,6 +3,17 @@
 Formato: `## <versione> · <data>`, poi `### Novità`, `### Miglioramenti`, `### Correzioni`, una riga `- ` per
 cambiamento. L'app mostra la sezione della sua versione in Impostazioni › Aggiornamenti (Sources/App/Changelog.swift).
 
+## 0.5.6 · 2026-11-17
+
+Più protezioni per quello che scrivi.
+
+### Miglioramenti
+- **Gemma locale solo per Type_w/Me.** Il motore Gemma che gira sul Mac accetta soltanto le richieste di Type_w/Me: gli altri programmi e gli altri utenti del Mac non possono più interrogarlo.
+- **Memoria delle frasi cifrata.** Le frasi che accetti ora sono salvate cifrate, come la cronologia di scrittura. Quelle già salvate si convertono da sole al primo avvio. Se la chiave nel Portachiavi non è disponibile, restano solo in memoria e non si scrivono mai in chiaro.
+- **Cartella dei dati più riservata.** La cartella di Type_w/Me in Application Support e i file dentro sono leggibili solo da te.
+- **Firma più rigida.** L'app è firmata con protezioni più strette contro l'iniezione di codice da parte di altri programmi.
+- **llama.cpp verificato.** Prima di entrare nell'app, il llama.cpp incluso viene controllato con la sua impronta.
+
 ## 0.5.5 · 2026-11-07
 
 Un correttore al posto di Grammarly, sinonimi, e suggerimenti che imparano app per app.

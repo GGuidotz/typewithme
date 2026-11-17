@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- NSAppleScript (Terminal.swift) apre il Terminale per il comando di aggiornamento. -->
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+	<!-- Le librerie di llama.cpp (Contents/Helpers/llama, e libllama collegata dentro l'app) sono firmate con
+	     un'identita' locale senza Team ID: con l'hardened runtime la validazione delle librerie le rifiuterebbe.
+	     Da provare sul Mac togliendo questa chiave: se Gemma dentro l'app si carica lo stesso, va tolta. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>

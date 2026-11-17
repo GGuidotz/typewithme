@@ -233,9 +233,15 @@ final class TypingHistory: ObservableObject {
         var add = base
         add[kSecValueData as String] = data
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        // Se esiste una voce di dimensione sbagliata la si toglie e si riprova una volta.
         var status = SecItemAdd(add as CFDictionary, nil)
         if status == errSecDuplicateItem {
+            // La memoria delle frasi chiede la chiave da un'altra coda: se nel frattempo l'ha creata l'altra parte, si usa
+            // quella (cancellarla renderebbe illeggibile ciò che è già stato cifrato).
+            var again: CFTypeRef?
+            if SecItemCopyMatching(query as CFDictionary, &again) == errSecSuccess, let data = again as? Data, data.count == 32 {
+                return SymmetricKey(data: data)
+            }
+            // Una voce di dimensione sbagliata: la si toglie e si riprova una volta.
             SecItemDelete(base as CFDictionary)
             status = SecItemAdd(add as CFDictionary, nil)
         }

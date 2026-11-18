@@ -240,10 +240,11 @@ else
 fi
 codesign --verify --strict "$APP"
 # L'hardened runtime deve esserci davvero (app e llama-server), altrimenti la firma non protegge dall'iniezione di codice.
-codesign -dv "$APP" 2>&1 | grep -q 'flags=.*runtime' || { echo "Manca l'hardened runtime nella firma dell'app." >&2; exit 1; }
+SIGN_INFO="$(codesign -dv "$APP" 2>&1)"
+[[ "$SIGN_INFO" == *flags=*runtime* ]] || { echo "Manca l'hardened runtime nella firma dell'app." >&2; exit 1; }
 if [ -f "$APP/Contents/Helpers/llama/llama-server" ]; then
-  codesign -dv "$APP/Contents/Helpers/llama/llama-server" 2>&1 | grep -q 'flags=.*runtime' \
-    || { echo "Manca l'hardened runtime nella firma di llama-server." >&2; exit 1; }
+  SIGN_INFO="$(codesign -dv "$APP/Contents/Helpers/llama/llama-server" 2>&1)"
+  [[ "$SIGN_INFO" == *flags=*runtime* ]] || { echo "Manca l'hardened runtime nella firma di llama-server." >&2; exit 1; }
 fi
 echo "Pronto: $APP ($VERSION, build $BUILD_NUMBER, commit $COMMIT, firma $SIGNING, icona $ICON_TIER${ICON_CHECK:+: $ICON_CHECK}, llama.cpp ${LLAMA_TAG:-da Homebrew}, Gemma dentro l'app: $INPROCESS)"
 

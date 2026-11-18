@@ -2,8 +2,8 @@
 
 # Cask di Type_w/Me per il tap GGuidotz/homebrew-tap. Version e sha256 li aggiorna release.sh.
 cask "typewithme" do
-  version "0.5.5"
-  sha256 "1eaec47417e64323b54414253ae319348aa9e3246b3b7af941c47bf91761d2f4"
+  version "0.5.6"
+  sha256 "2c5a73c5c0313ab6e621349b7a6852ec1b99b12a7cd24aca6330b1387a9aff16"
 
   url "https://github.com/GGuidotz/typewithme/releases/download/v#{version}/TypeWithMe-#{version}.dmg"
   name "Type_w/Me"

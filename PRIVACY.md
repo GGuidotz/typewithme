@@ -28,7 +28,7 @@ scrivi non va in rete. La rete serve solo per:
 ## Cosa si salva
 
 - Le impostazioni, in UserDefaults.
-- La memoria delle frasi che accetti, in chiaro, in `~/Library/Application Support/TypeWithMe/phrases.json`.
+- La memoria delle frasi che accetti, cifrata come la cronologia (AES-GCM, chiave nel Portachiavi), in `~/Library/Application Support/TypeWithMe/phrases.bin`.
 - La cronologia di scrittura, solo se la accendi (Impostazioni › Personalizzazione): un file cifrato (AES-GCM) in
   `~/Library/Application Support/TypeWithMe`, con la chiave nel Portachiavi.
 - Niente altro. Lo schermo non si salva mai.
@@ -76,7 +76,7 @@ text you type does not go on the network. The network is used only to:
 ## What is saved
 
 - Settings, in UserDefaults.
-- The memory of the phrases you accept, in plain text, in `~/Library/Application Support/TypeWithMe/phrases.json`.
+- The memory of the phrases you accept, encrypted like the history (AES-GCM, key in the Keychain), in `~/Library/Application Support/TypeWithMe/phrases.bin`.
 - The writing history, only if you turn it on (Settings › Personalization): an encrypted file (AES-GCM) in
   `~/Library/Application Support/TypeWithMe`, with the key in the Keychain.
 - Nothing else. The screen is never saved.

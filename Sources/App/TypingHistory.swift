@@ -44,6 +44,7 @@ final class TypingHistory: ObservableObject {
         let base = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent(AppInfo.supportFolder, isDirectory: true)
         url = base.appendingPathComponent("history.sealed")
+        SupportFiles.prepare(base)
         load()
     }
 
@@ -210,10 +211,10 @@ final class TypingHistory: ObservableObject {
 
     // MARK: - File cifrato
 
-    private static var keychainService: String { AppInfo.bundleID + ".history" }
+    private nonisolated static var keychainService: String { AppInfo.bundleID + ".history" }
 
     /// La chiave nel Portachiavi; con `create` la crea se manca.
-    private static func key(create: Bool) -> SymmetricKey? {
+    nonisolated static func key(create: Bool) -> SymmetricKey? {
         let base: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: keychainService,
@@ -232,9 +233,15 @@ final class TypingHistory: ObservableObject {
         var add = base
         add[kSecValueData as String] = data
         add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        // Se esiste una voce di dimensione sbagliata la si toglie e si riprova una volta.
         var status = SecItemAdd(add as CFDictionary, nil)
         if status == errSecDuplicateItem {
+            // La memoria delle frasi chiede la chiave da un'altra coda: se nel frattempo l'ha creata l'altra parte, si usa
+            // quella (cancellarla renderebbe illeggibile ciò che è già stato cifrato).
+            var again: CFTypeRef?
+            if SecItemCopyMatching(query as CFDictionary, &again) == errSecSuccess, let data = again as? Data, data.count == 32 {
+                return SymmetricKey(data: data)
+            }
+            // Una voce di dimensione sbagliata: la si toglie e si riprova una volta.
             SecItemDelete(base as CFDictionary)
             status = SecItemAdd(add as CFDictionary, nil)
         }
@@ -285,8 +292,9 @@ final class TypingHistory: ObservableObject {
             do {
                 let sealed = try AES.GCM.seal(plain, using: key).combined
                 guard let sealed else { return }
-                try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+                SupportFiles.prepare(target.deletingLastPathComponent())
                 try sealed.write(to: target, options: .atomic)
+                SupportFiles.protect(target)
             } catch {}
         }
         if wait { queue.sync(execute: work) } else { queue.async(execute: work) }

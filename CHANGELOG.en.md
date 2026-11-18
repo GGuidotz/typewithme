@@ -3,6 +3,17 @@
 English notes, same format as CHANGELOG.md (the Italian one is the reference). The app uses these when its language
 is English; versions missing here fall back to the Italian notes.
 
+## 0.5.6 · 2026-11-17
+
+More protection for what you write.
+
+### Improvements
+- **Local Gemma only for Type_w/Me.** The Gemma engine running on your Mac now accepts requests from Type_w/Me only: other programs and other users of the Mac can no longer query it.
+- **Encrypted phrase memory.** The phrases you accept are now saved encrypted, like the writing history. Those already saved convert on their own at first launch. If the Keychain key is not available, they stay in memory only and are never written in plain text.
+- **More private data folder.** The Type_w/Me folder in Application Support and the files in it are readable only by you.
+- **Stricter signing.** The app is signed with tighter protections against code injection by other programs.
+- **Verified llama.cpp.** The bundled llama.cpp is checked against its fingerprint before it goes into the app.
+
 ## 0.5.5 · 2026-11-07
 
 A proofreader instead of Grammarly, synonyms, and suggestions that learn app by app.

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- llama-server carica le dylib accanto a se' (libllama, libggml...), firmate con la stessa identita' locale
+	     senza Team ID. Da provare sul Mac togliendo la chiave: se llama-server parte lo stesso, va tolta. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>

@@ -3,7 +3,8 @@
 # il motore dentro l'app (LlamaRuntime.swift) si compila contro questi e si collega alle librerie della stessa build.
 set -euo pipefail
 cd "${0:A:h}/.."
-TAG=$(tr -d '[:space:]' < packaging/llama.cpp-version)
+# Solo la prima riga è il tag (la seconda, facoltativa, è "sha256 <hash>" per build.sh).
+TAG=$(head -n 1 packaging/llama.cpp-version | tr -d '[:space:]')
 [ "$TAG" = latest ] && { echo "Scrivi una build precisa (bNNNN) in packaging/llama.cpp-version." >&2; exit 1; }
 mkdir -p Vendor/llama/include
 BASE="https://raw.githubusercontent.com/ggml-org/llama.cpp/$TAG"

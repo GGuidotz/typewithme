@@ -65,7 +65,7 @@ final class Completer: ObservableObject {
     let prefs: Preferences
     let apple = AppleEngine()
     let llama: LlamaServer
-    let memory = PhraseMemory()
+    let memory = PhraseMemory(seal: PhraseSealing.seal, unseal: PhraseSealing.open)
     let monitor = KeyMonitor()
     let overlay = GhostOverlay()
     private lazy var rules = RulesEngine(memory: memory)

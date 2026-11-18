@@ -1,7 +1,8 @@
 // La memoria delle frasi: i seguiti che accetti, legati alle due parole che li precedono. Quando le stesse due parole
 // tornano, il seguito si propone subito, senza modello. Si impara solo dopo averlo accettato almeno due volte, così un
-// seguito preso una volta per sbaglio non torna. Un file JSON in Application Support, cancellabile con "Dimentica tutto".
-// Mai sincronizzato, mai inviato: resta sul Mac.
+// seguito preso una volta per sbaglio non torna. Un file cifrato in Application Support (la cifratura la dà chi crea la
+// memoria, con la chiave nel Portachiavi: qui solo Foundation), cancellabile con "Dimentica tutto". Senza cifratura la
+// memoria resta in RAM e non si scrive mai in chiaro. Mai sincronizzato, mai inviato: resta sul Mac.
 
 import Foundation
 
@@ -14,6 +15,10 @@ final class PhraseMemory {
     /// chiave "parola1 parola2" → seguito → conteggio
     private var table: [String: [String: Entry]] = [:]
     private let url: URL
+    /// Il vecchio file in chiaro (fino alla 0.5.5): si legge una volta, si riscrive cifrato e si cancella.
+    private let legacyURL: URL
+    private let seal: (@Sendable (Data) -> Data?)?
+    private let unseal: (@Sendable (Data) -> Data?)?
     private let queue = DispatchQueue(label: "\(AppInfo.bundleID).phrases", qos: .utility)
     private var saveScheduled = false
 
@@ -22,10 +27,15 @@ final class PhraseMemory {
     static let keyWords = 2
     static let maxContinuationWords = 8
 
-    init(directory: URL? = nil) {
+    /// `seal` cifra e `unseal` decifra (nil se non riesce, per esempio senza chiave). Senza `seal` non si scrive niente.
+    init(directory: URL? = nil, seal: (@Sendable (Data) -> Data?)? = nil, unseal: (@Sendable (Data) -> Data?)? = nil) {
         let base = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent(AppInfo.supportFolder, isDirectory: true)
-        url = base.appendingPathComponent("phrases.json")
+        url = base.appendingPathComponent("phrases.bin")
+        legacyURL = base.appendingPathComponent("phrases.json")
+        self.seal = seal
+        self.unseal = unseal
+        SupportFiles.prepare(base)
         load()
     }
 
@@ -72,14 +82,22 @@ final class PhraseMemory {
     func forgetAll() {
         table = [:]
         try? FileManager.default.removeItem(at: url)
+        try? FileManager.default.removeItem(at: legacyURL)
     }
 
     // MARK: - File
 
     private func load() {
-        guard let data = try? Data(contentsOf: url),
+        if let sealed = try? Data(contentsOf: url) {
+            if let unseal, let data = unseal(sealed),
+               let decoded = try? JSONDecoder().decode([String: [String: Entry]].self, from: data) { table = decoded }
+            return
+        }
+        // Migrazione dal file in chiaro: si legge e si riscrive cifrato (write lo cancella a cifratura riuscita).
+        guard let data = try? Data(contentsOf: legacyURL),
               let decoded = try? JSONDecoder().decode([String: [String: Entry]].self, from: data) else { return }
         table = decoded
+        scheduleSave()
     }
 
     private func prune() {
@@ -114,10 +132,15 @@ final class PhraseMemory {
     }
 
     private func write(_ snapshot: [String: [String: Entry]]) {
+        // Senza cifratura (o senza chiave) niente su disco: mai in chiaro.
+        guard let seal else { return }
         do {
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            SupportFiles.prepare(url.deletingLastPathComponent())
             let data = try JSONEncoder().encode(snapshot)
-            try data.write(to: url, options: .atomic)
+            guard let sealed = seal(data) else { return }
+            try sealed.write(to: url, options: .atomic)
+            SupportFiles.protect(url)
+            try? FileManager.default.removeItem(at: legacyURL)
         } catch {
             // Niente da fare: la memoria resta in RAM fino alla prossima volta.
         }

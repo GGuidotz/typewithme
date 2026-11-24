@@ -76,28 +76,35 @@ struct KeyBinding: Codable, Equatable {
 }
 
 /// Mostra una combinazione e permette di registrarne un'altra: clic su "Cambia", poi il tasto. Esc annulla.
+/// Una riga di Sguardo: il nome a sinistra, a destra la combinazione in una capsula e i pulsanti.
 struct KeyBindingRecorder: View {
     var title: String
     @Binding var binding: KeyBinding
     var reset: KeyBinding
     @State private var recording = false
     @State private var monitor: Any?
+    @Environment(\.sgAccent) private var accent
 
     var body: some View {
-        LabeledContent(title) {
+        SGLabeledRow {
+            Text(title)
+        } trailing: {
             HStack(spacing: 8) {
                 Text(recording ? L("Premi i tasti…") : binding.display)
-                    .font(.system(.body, design: .rounded).weight(.medium))
+                    .font(SG.Font.bodyEmphasis)
                     .monospacedDigit()
+                    .lineLimit(1)
                     .frame(minWidth: 70)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(recording ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.07)))
+                    .padding(.horizontal, 12)
+                    .frame(height: 26)
+                    .background(Capsule().fill(recording ? accent.selectedWash : SG.Fill.pickerPill))
+                    .overlay(Capsule().strokeBorder(recording ? accent.base : SG.Fill.rowBorder, lineWidth: SG.Stroke.hairline))
                     .accessibilityLabel(L("Combinazione attuale: %@", binding.display))
                 Button(recording ? L("Annulla") : L("Cambia")) { recording ? stop() : start() }
+                    .buttonStyle(.sgSecondary)
                 if binding != reset, !recording {
                     Button(L("Ripristina")) { binding = reset }
+                        .buttonStyle(.sgSecondary)
                 }
             }
         }

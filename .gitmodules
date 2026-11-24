@@ -1,0 +1,3 @@
+[submodule "Vendor/Sguardo"]
+	path = Vendor/Sguardo
+	url = https://github.com/GGuidotz/sguardo.git

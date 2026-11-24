@@ -95,10 +95,11 @@ trashed.
 ### Build from source
 
 macOS 26 and the command line tools (`xcode-select --install`) are required; with Xcode installed, the Liquid Glass
-icon is built too, if present.
+icon is built too, if present. `--recursive` also fetches Sguardo, the shared design system
+(github.com/GGuidotz/sguardo), into `Vendor/Sguardo`; if you already cloned without it, run `git submodule update --init`.
 
 ```sh
-git clone https://github.com/GGuidotz/typewithme.git
+git clone --recursive https://github.com/GGuidotz/typewithme.git
 cd typewithme
 ./build.sh              # builds TypeWithMe.app
 ./build.sh --install    # builds and copies to Applications

@@ -129,6 +129,12 @@ if [ "${TYPEWITHME_LLAMA:-}" != none ]; then
 fi
 
 SOURCES=(Sources/**/*.swift)
+# Sguardo, il sistema di design comune (github.com/GGuidotz/sguardo): submodule in Vendor/Sguardo, compilato insieme
+# all'app (un modulo solo, niente import). Per provare modifiche al kit senza aggiornare il submodule:
+# SGUARDO_DIR=~/Developer/design-system ./build.sh
+SGUARDO="${SGUARDO_DIR:-Vendor/Sguardo}/swift/Sources/Sguardo"
+[ -d "$SGUARDO" ] || { echo "Manca Sguardo: esegui git submodule update --init" >&2; exit 1; }
+SOURCES+=("$SGUARDO"/*.swift)
 # Apple Intelligence (FoundationModels): collegato "debole", così l'app parte anche su un Mac dove il framework manca
 # (il codice controlla comunque la disponibilità prima di usarlo).
 LINK=()

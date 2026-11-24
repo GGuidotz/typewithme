@@ -3,6 +3,18 @@
 Formato: `## <versione> · <data>`, poi `### Novità`, `### Miglioramenti`, `### Correzioni`, una riga `- ` per
 cambiamento. L'app mostra la sezione della sua versione in Impostazioni › Aggiornamenti (Sources/App/Changelog.swift).
 
+## 0.5.7 · 2026-11-24
+
+Una veste nuova: forme, colori e movimenti di Sguardo, il sistema di design comune alle nostre app, e il colore d'accento a scelta.
+
+### Novità
+- **Colore d'accento a scelta.** In Impostazioni › Generale: il blu del cursore di Type_w/Me, il colore d'accento di macOS o uno tuo.
+
+### Miglioramenti
+- **Impostazioni ridisegnate.** Righe su un velo traslucido con un filo sottile, menu e campi a capsula, note brevi sotto ogni gruppo. La barra delle schede galleggia in fondo e mostra il nome della scheda scelta; da ⌘1 a ⌘7 funzionano come prima.
+- **Guida, novità e pannelli nello stesso stile.** Pulsanti a capsula, passaggi della guida con una dissolvenza sfocata, Riscrivi, Sinonimi e Correggi con gli stessi controlli. Il vetro resta solo sulla barra delle schede.
+- **Si compila da un clone.** Sguardo arriva con `git clone --recursive`: chi compila dal codice ha tutto.
+
 ## 0.5.6 · 2026-11-17
 
 Più protezioni per quello che scrivi.

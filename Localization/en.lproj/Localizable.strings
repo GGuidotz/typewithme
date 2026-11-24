@@ -143,6 +143,10 @@
 "Le tue istruzioni" = "Your instructions";
 "Le tue scelte" = "Your choices";
 "Lingua" = "Language";
+"Colore d'accento" = "Accent color";
+"Colore dell'app" = "App color";
+"Colore di sistema" = "System color";
+"Personalizzato" = "Custom";
 "llama.cpp non si avvia: %@" = "llama.cpp doesn't start: %@";
 "llama.cpp non è installato." = "llama.cpp is not installed.";
 "llama.cpp non è stato pronto in mezz'ora: riprova, o scegli un modello più piccolo." = "llama.cpp wasn't ready within half an hour: try again, or choose a smaller model.";

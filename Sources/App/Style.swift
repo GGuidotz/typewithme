@@ -1,7 +1,10 @@
-// Colori e vetro, in un posto solo.
-// Regola (HIG, Liquid Glass): il vetro solo sui controlli che galleggiano (la barra delle schede, i pulsanti in fondo);
-// il contenuto usa riempimenti standard. Riduci trasparenza e Aumenta contrasto li gestisce il sistema.
-// Il testo fantasma usa il grigio dei segnaposto del sistema (GhostOverlay), non un colore nostro.
+// Colori e vetro, in un posto solo. Le forme, i riempimenti e le molle vengono da Sguardo, il sistema di design comune
+// (github.com/GGuidotz/sguardo, submodule in Vendor/Sguardo, compilato insieme all'app da build.sh): qui restano i
+// colori di Type_w/Me. L'accento predefinito è `SG.Accent.typewithme` (il blu del cursore, Palette.cursor), che chi usa
+// l'app può cambiare in Impostazioni › Generale.
+// Regola (HIG, Liquid Glass): il vetro solo sui controlli che galleggiano (la barra delle schede); il contenuto usa i
+// riempimenti di Sguardo (velo traslucido + filo da 1 pt). Riduci trasparenza e Aumenta contrasto li gestisce il
+// sistema. Il testo fantasma usa il grigio dei segnaposto del sistema (GhostOverlay), non un colore nostro.
 
 import AppKit
 import SwiftUI
@@ -16,19 +19,15 @@ enum Palette {
 }
 
 extension View {
-    /// Vetro per i controlli che galleggiano. Mai per il contenuto.
-    @ViewBuilder
-    func glassSurface(in shape: some Shape, interactive: Bool = false) -> some View {
-        if #available(macOS 26.0, *) {
-            self.glassEffect(interactive ? .regular.interactive() : .regular, in: shape)
-        } else {
-            self.background(.ultraThinMaterial, in: shape)
-        }
+    /// Vetro per i controlli che galleggiano. Mai per il contenuto. Il materiale più il velo e il filo di Sguardo
+    /// restano il ripiego dove il vetro non c'è.
+    func glassSurface(in shape: some InsettableShape, interactive: Bool = false) -> some View {
+        sgFloatingChrome(in: shape, interactive: interactive)
     }
 
-    /// Pulsante di vetro (secondario).
+    /// Pulsante di vetro (secondario), solo nelle barre che galleggiano. Nel contenuto: `.buttonStyle(.sgSecondary)`.
     @ViewBuilder
-    func glassButton() -> some View {
+    func floatingGlassButton() -> some View {
         if #available(macOS 26.0, *) {
             self.buttonStyle(.glass)
         } else {
@@ -36,9 +35,9 @@ extension View {
         }
     }
 
-    /// Il pulsante principale, uno per vista: vetro colorato.
+    /// Il pulsante principale di una barra che galleggia: vetro colorato. Nel contenuto: `.buttonStyle(.sgPrimary)`.
     @ViewBuilder
-    func glassProminentButton() -> some View {
+    func floatingGlassProminentButton() -> some View {
         if #available(macOS 26.0, *) {
             self.buttonStyle(.glassProminent)
         } else {
@@ -46,8 +45,9 @@ extension View {
         }
     }
 
-    /// Una scheda del contenuto: un velo chiaro con un filo di luce sul bordo alto. Statico, niente sfocature in più.
-    func contentCard(padding: CGFloat = 12, radius: CGFloat = 12) -> some View {
+    /// Una scheda del contenuto, come le righe di Sguardo: velo traslucido (più bianco della finestra in chiaro), filo da
+    /// 1 pt, angoli continui da 16 pt. Niente vetro (il vetro è dei controlli), niente ombre, niente animazioni.
+    func contentCard(padding: CGFloat = 12, radius: CGFloat = SG.Radius.row) -> some View {
         self.padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .modifier(ContentCardBackground(radius: radius))
@@ -56,46 +56,57 @@ extension View {
 
 private struct ContentCardBackground: ViewModifier {
     var radius: CGFloat
-    @Environment(\.colorScheme) private var scheme
     @Environment(\.colorSchemeContrast) private var contrast
 
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        let dark = scheme == .dark
-        let strong = contrast == .increased
         content
-            .background(dark ? Color.white.opacity(strong ? 0.12 : 0.07) : Color.white.opacity(strong ? 0.8 : 0.5), in: shape)
+            .sgRowSurface(in: shape)
             .overlay {
-                shape.strokeBorder(
-                    LinearGradient(colors: [Color.white.opacity(dark ? 0.22 : 0.9), Color.white.opacity(dark ? 0.04 : 0.3)],
-                                   startPoint: .top, endPoint: .bottom),
-                    lineWidth: 0.75)
-            }
-            .overlay {
-                if strong { shape.strokeBorder(Color.primary.opacity(0.25), lineWidth: 1) }
+                // Aumenta contrasto: un bordo pieno sopra il filo.
+                if contrast == .increased { shape.strokeBorder(Color.primary.opacity(0.35), lineWidth: 1) }
             }
     }
 }
 
-/// Contenitore dei controlli di vetro: su macOS 26 le forme vicine si fondono e si trasformano insieme.
-struct GlassGroup<Content: View>: View {
-    var spacing: CGFloat = 8
-    @ViewBuilder var content: Content
+extension View {
+    /// Un campo di testo nello stile di Sguardo: capsula con il velo dei menu e il filo da 1 pt. Sguardo ha il campo
+    /// solo per l'isola (SGIslandField), questo è per le finestre. Su più righe gli angoli sono quelli dei riquadri.
+    func sgField(multiline: Bool = false) -> some View {
+        modifier(SGFieldStyle(multiline: multiline))
+    }
+}
 
-    var body: some View {
-        if #available(macOS 26.0, *) {
-            GlassEffectContainer(spacing: spacing) { content }
-        } else {
-            content
-        }
+private struct SGFieldStyle: ViewModifier {
+    var multiline: Bool
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: multiline ? SG.Radius.tile : 14, style: .continuous)
+        content
+            .textFieldStyle(.plain)
+            .font(SG.Font.field)
+            .padding(.horizontal, 12)
+            .padding(.vertical, multiline ? 8 : 0)
+            .frame(minHeight: 28)
+            .background(shape.fill(SG.Fill.pickerPill))
+            .overlay(shape.strokeBorder(SG.Fill.rowBorder, lineWidth: SG.Stroke.hairline))
+    }
+}
+
+private struct OptionalCard: ViewModifier {
+    var framed: Bool
+    @ViewBuilder func body(content: Content) -> some View {
+        if framed { content.contentCard() } else { content.frame(maxWidth: .infinity, alignment: .leading) }
     }
 }
 
 /// Un esempio di come appare un suggerimento: testo scritto, cursore, seguito in grigio. Per la guida e le impostazioni.
+/// `framed: false` dentro un gruppo di righe, che ha già la sua superficie.
 struct GhostPreview: View {
     var written: String
     var ghost: String
     var accept: String
+    var framed = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -107,10 +118,10 @@ struct GhostPreview: View {
             .font(.system(size: 15))
             .lineLimit(1)
             Text(accept)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(SG.Font.caption)
+                .foregroundStyle(SG.Ink.secondary)
         }
-        .contentCard()
+        .modifier(OptionalCard(framed: framed))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(L("Esempio: hai scritto %@ e il suggerimento è %@", written, ghost))
     }

@@ -417,17 +417,17 @@ struct ProofreadView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text(L("Correggi")).font(.headline)
+                Text(L("Correggi")).font(SG.Font.instruction)
                 Spacer()
                 if proofreader.checking {
                     ProgressView().controlSize(.small)
-                    Text(L("Controllo la grammatica…")).font(.caption).foregroundStyle(.secondary)
+                    Text(L("Controllo la grammatica…")).font(SG.Font.caption).foregroundStyle(SG.Ink.secondary)
                 }
             }
             .padding(.top, 6)
             if proofreader.issues.isEmpty {
                 Text(proofreader.checking ? L("Sto controllando il paragrafo.") : L("Nessun errore nel paragrafo."))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(SG.Ink.secondary)
                 Spacer()
             } else {
                 ScrollView {
@@ -438,17 +438,20 @@ struct ProofreadView: View {
                 }
             }
             HStack {
-                Text(L("Invio applica tutto, Esc chiude.")).font(.caption).foregroundStyle(.secondary)
+                Text(L("Invio applica tutto, Esc chiude.")).font(SG.Font.caption).foregroundStyle(SG.Ink.secondary)
                 Spacer()
                 Button(L("Chiudi")) { proofreader.closePanel() }
+                    .buttonStyle(.sgSecondary)
                     .keyboardShortcut(.cancelAction)
                 Button(L("Applica tutto")) { proofreader.apply(proofreader.issues) }
+                    .buttonStyle(.sgPrimary)
                     .keyboardShortcut(.defaultAction)
                     .disabled(proofreader.issues.isEmpty)
             }
         }
         .padding(16)
         .frame(width: Self.size.width, height: Self.size.height)
+        .sguardoAccent(default: .typewithme)
     }
 
     private func row(_ issue: Proofreader.Issue) -> some View {
@@ -456,13 +459,15 @@ struct ProofreadView: View {
             Image(systemName: issue.kind == .grammar ? "text.badge.checkmark" : "character.cursor.ibeam")
                 .foregroundStyle(issue.kind == .grammar ? Color.blue : Color.red)
                 .accessibilityLabel(issue.kind == .grammar ? L("Grammatica") : L("Ortografia"))
-            Text(issue.edit.original).strikethrough().foregroundStyle(.secondary)
-            Image(systemName: "arrow.right").font(.caption).foregroundStyle(.secondary)
+            Text(issue.edit.original).strikethrough().foregroundStyle(SG.Ink.secondary)
+            Image(systemName: "arrow.right").font(SG.Font.caption).foregroundStyle(SG.Ink.secondary)
             Text(issue.edit.replacement).fontWeight(.semibold)
             Spacer()
-            Button(L("Applica")) { proofreader.apply([issue]) }.controlSize(.small)
+            Button(L("Applica")) { proofreader.apply([issue]) }
+                .buttonStyle(.sgSecondary)
             if issue.kind == .spelling {
-                Button(L("Ignora")) { proofreader.ignore(issue) }.controlSize(.small)
+                Button(L("Ignora")) { proofreader.ignore(issue) }
+                    .buttonStyle(.sgSecondary)
             }
         }
     }

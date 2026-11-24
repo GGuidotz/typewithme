@@ -70,12 +70,13 @@ struct OnboardingView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(.horizontal, 36)
             .padding(.top, 44)
-            .transition(.opacity)
+            .transition(reduceMotion ? .opacity : .sgBlurReplace)
             .id(step)
 
             footer
         }
         .frame(width: Self.size.width, height: Self.size.height)
+        .sguardoAccent(default: .typewithme)
         .id(prefs.language)
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             accessibility = Permissions.accessibility
@@ -98,12 +99,11 @@ struct OnboardingView: View {
                 .frame(width: 96, height: 96)
                 .accessibilityHidden(true)
             Text(L("Benvenuto in Type_w/Me"))
-                .font(.largeTitle.weight(.semibold))
-                .fontDesign(.rounded)
+                .font(SG.Font.title)
                 .multilineTextAlignment(.center)
             Text(L("Mentre scrivi, in qualunque app, ti propone il seguito in grigio. Tab per prenderlo, continuare a scrivere per ignorarlo. Tutto sul Mac: niente rete, niente dati che escono."))
-                .font(.title3)
-                .foregroundStyle(.secondary)
+                .font(SG.Font.instruction)
+                .foregroundStyle(SG.Ink.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
             GhostPreview(written: L("Grazie per la disponibilità, ci"), ghost: L(" sentiamo la prossima settimana."),
@@ -128,9 +128,9 @@ struct OnboardingView: View {
                 Label(L("Tutto a posto: Type_w/Me vede la tastiera."), systemImage: "checkmark.circle.fill")
                     .foregroundStyle(Palette.calm)
             } else if accessibility {
-                Footnote(L("Permesso concesso ma macOS non consegna ancora i tasti: chiudi e riapri Type_w/Me."))
+                SGFootnote(L("Permesso concesso ma macOS non consegna ancora i tasti: chiudi e riapri Type_w/Me."))
             }
-            Footnote(L("In Impostazioni di Sistema › Privacy e sicurezza trovi Type_w/Me nell'elenco: accendi l'interruttore. Niente esce dal Mac."))
+            SGFootnote(L("In Impostazioni di Sistema › Privacy e sicurezza trovi Type_w/Me nell'elenco: accendi l'interruttore. Niente esce dal Mac."))
         }
     }
 
@@ -153,8 +153,9 @@ struct OnboardingView: View {
                 Text(EngineChoice.apple.title).tag(EngineChoice.apple)
             }
             .pickerStyle(.segmented)
+            .labelsHidden()
             .padding(.top, 4)
-            Footnote(L("Consigliato: Automatico. Usa Gemma quando c'è llama.cpp, altrimenti Apple Intelligence. Si cambia in Impostazioni › Motori."))
+            SGFootnote(L("Consigliato: Automatico. Usa Gemma quando c'è llama.cpp, altrimenti Apple Intelligence. Si cambia in Impostazioni › Motori."))
         }
     }
 
@@ -169,24 +170,32 @@ struct OnboardingView: View {
             Tip(symbol: "pencil.line", text: L("%@ sul testo selezionato: più breve, più formale, correggi, o un'istruzione tua.", prefs.rewrite.display))
             WordLimitSlider(prefs: prefs)
                 .padding(.top, 4)
-            Footnote(L("Tasti e lunghezza si cambiano in Impostazioni › Suggerimenti."))
+            SGFootnote(L("Tasti e lunghezza si cambiano in Impostazioni › Suggerimenti."))
         }
     }
 
     private var choices: some View {
         StepPage(symbol: "hand.raised", title: L("Le tue scelte"),
                  text: L("Tre cose che decidi tu. Si cambiano quando vuoi.")) {
-            Picker(L("Gli appunti come contesto"), selection: Binding(
-                get: { prefs.clipboardContext },
-                set: { prefs.clipboardContext = $0; prefs.clipboardDecided = true }
-            )) {
-                Text(L("No, non leggerli")).tag(false)
-                Text(L("Sì, usali se c'entrano")).tag(true)
+            SGGroup {
+                SGRowBlock {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Picker(L("Gli appunti come contesto"), selection: Binding(
+                            get: { prefs.clipboardContext },
+                            set: { prefs.clipboardContext = $0; prefs.clipboardDecided = true }
+                        )) {
+                            Text(L("No, non leggerli")).tag(false)
+                            Text(L("Sì, usali se c'entrano")).tag(true)
+                        }
+                        .pickerStyle(.radioGroup)
+                        SGFootnote(L("Con gli appunti il modello vede anche l'ultima cosa che hai copiato (un nome, un numero, un indirizzo) e la usa se serve al seguito. Resta sul Mac."))
+                    }
+                }
+                SGDivider()
+                SGToggleRow(L("Correzioni italiane in linea (\"perche\" diventa \"perché\")"), isOn: $prefs.italianCorrections)
+                SGDivider()
+                SGToggleRow(L("Ricorda le frasi che accetto e riproponile"), isOn: $prefs.phraseMemory)
             }
-            .pickerStyle(.radioGroup)
-            Footnote(L("Con gli appunti il modello vede anche l'ultima cosa che hai copiato (un nome, un numero, un indirizzo) e la usa se serve al seguito. Resta sul Mac."))
-            Toggle(L("Correzioni italiane in linea (\"perche\" diventa \"perché\")"), isOn: $prefs.italianCorrections)
-            Toggle(L("Ricorda le frasi che accetto e riproponile"), isOn: $prefs.phraseMemory)
         }
     }
 
@@ -195,18 +204,18 @@ struct OnboardingView: View {
                  text: L("Prova qui sotto: scrivi l'inizio di una frase e fermati un attimo.")) {
             TextField(L("Per esempio: Buongiorno Marta, ti scrivo per"), text: $tryText, axis: .vertical)
                 .lineLimit(3...5)
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 15))
+                .sgField(multiline: true)
             if !completer.monitor.isRunning {
-                Footnote(L("Manca il permesso Accessibilità: torna indietro di quattro passi per concederlo."))
+                SGFootnote(L("Manca il permesso Accessibilità: torna indietro di quattro passi per concederlo."))
             }
             Tip(symbol: "menubar.rectangle", text: L("Nella barra dei menu trovi lo stato, la pausa e \"Suggerisci in questa app\" per spegnere Type_w/Me dove non lo vuoi."))
             Tip(symbol: "lock", text: L("Nei campi password e nelle app con input sicuro non suggerisce mai. Gestori di password e Terminale sono esclusi in partenza."))
-            Toggle(L("Apri all'accesso"), isOn: Binding(
-                get: { LaunchAtLogin.isEnabled },
-                set: { LaunchAtLogin.set($0) }
-            ))
-            .toggleStyle(.switch)
+            SGGroup {
+                SGToggleRow(L("Apri all'accesso"), isOn: Binding(
+                    get: { LaunchAtLogin.isEnabled },
+                    set: { LaunchAtLogin.set($0) }
+                ))
+            }
             .padding(.top, 8)
         }
     }
@@ -218,7 +227,7 @@ struct OnboardingView: View {
             HStack(spacing: 6) {
                 ForEach(0..<steps, id: \.self) { i in
                     Circle()
-                        .fill(i == step ? Color.primary.opacity(0.75) : Color.primary.opacity(0.2))
+                        .fill(i == step ? SG.Ink.primary : SG.Ink.tertiary.opacity(0.5))
                         .frame(width: 6, height: 6)
                 }
             }
@@ -227,20 +236,17 @@ struct OnboardingView: View {
 
             Spacer()
 
-            GlassGroup(spacing: 8) {
-                HStack(spacing: 8) {
-                    if step > 0 {
-                        Button(L("Indietro")) { go(step - 1) }
-                            .glassButton()
-                            .keyboardShortcut(.cancelAction)
-                    }
-                    Button(step == steps - 1 ? L("Inizia") : L("Avanti")) {
-                        if step == steps - 1 { finish() } else { go(step + 1) }
-                    }
-                    .glassProminentButton()
-                    .keyboardShortcut(.defaultAction)
+            HStack(spacing: 10) {
+                if step > 0 {
+                    Button(L("Indietro")) { go(step - 1) }
+                        .buttonStyle(SGCapsuleButtonStyle(.secondary, size: .large))
+                        .keyboardShortcut(.cancelAction)
                 }
-                .controlSize(.large)
+                Button(step == steps - 1 ? L("Inizia") : L("Avanti")) {
+                    if step == steps - 1 { finish() } else { go(step + 1) }
+                }
+                .buttonStyle(SGCapsuleButtonStyle(.primary, size: .large))
+                .keyboardShortcut(.defaultAction)
             }
         }
         .padding(.horizontal, 24)
@@ -248,7 +254,7 @@ struct OnboardingView: View {
     }
 
     private func go(_ next: Int) {
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { step = min(max(0, next), steps - 1) }
+        withAnimation(reduceMotion ? .easeInOut(duration: 0.2) : SG.Motion.standard) { step = min(max(0, next), steps - 1) }
     }
 }
 
@@ -266,12 +272,11 @@ private struct StepPage<Content: View>: View {
                 .foregroundStyle(.tint)
                 .accessibilityHidden(true)
             Text(title)
-                .font(.title.weight(.semibold))
-                .fontDesign(.rounded)
+                .font(SG.Font.title)
                 .accessibilityAddTraits(.isHeader)
             Text(text)
-                .font(.title3)
-                .foregroundStyle(.secondary)
+                .font(SG.Font.instruction)
+                .foregroundStyle(SG.Ink.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(alignment: .leading, spacing: 12) { content }
                 .padding(.top, 6)
@@ -290,6 +295,7 @@ private struct Tip: View {
         } icon: {
             Image(systemName: symbol).foregroundStyle(.tint).frame(width: 22)
         }
-        .font(.body)
+        .font(SG.Font.body)
+        .foregroundStyle(SG.Ink.primary)
     }
 }

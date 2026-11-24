@@ -161,21 +161,21 @@ struct SynonymsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(controller.word.isEmpty ? L("Sinonimi") : controller.word).font(.headline).lineLimit(1)
+                Text(controller.word.isEmpty ? L("Sinonimi") : controller.word).font(SG.Font.instruction).lineLimit(1)
                 Spacer()
                 if controller.working { ProgressView().controlSize(.small) }
             }
             .padding(.top, 6)
             if let message = controller.message {
-                Text(message).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(message).foregroundStyle(SG.Ink.secondary).fixedSize(horizontal: false, vertical: true)
             } else if controller.options.isEmpty {
                 Text(controller.working ? L("Cerco alternative adatte alla frase…") : L("Nessuna alternativa trovata."))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(SG.Ink.secondary)
             } else {
                 ForEach(Array(controller.options.enumerated()), id: \.offset) { index, option in
                     Button { controller.choose(option) } label: {
                         HStack {
-                            Text("\(index + 1)").monospacedDigit().foregroundStyle(.secondary).frame(width: 14)
+                            Text("\(index + 1)").monospacedDigit().foregroundStyle(SG.Ink.secondary).frame(width: 14)
                             Text(option)
                             Spacer()
                         }
@@ -187,12 +187,15 @@ struct SynonymsView: View {
             }
             Spacer()
             HStack {
-                Text(L("Un numero sceglie, Esc chiude.")).font(.caption).foregroundStyle(.secondary)
+                Text(L("Un numero sceglie, Esc chiude.")).font(SG.Font.caption).foregroundStyle(SG.Ink.secondary)
                 Spacer()
-                Button(L("Chiudi")) { controller.closePanel() }.keyboardShortcut(.cancelAction)
+                Button(L("Chiudi")) { controller.closePanel() }
+                    .buttonStyle(.sgSecondary)
+                    .keyboardShortcut(.cancelAction)
             }
         }
         .padding(16)
         .frame(width: Self.size.width, height: Self.size.height)
+        .sguardoAccent(default: .typewithme)
     }
 }

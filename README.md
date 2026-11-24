@@ -97,10 +97,11 @@ cestinare.
 ### Compilare dai sorgenti
 
 Servono macOS 26 e gli strumenti a riga di comando (`xcode-select --install`); con Xcode installato si compila anche
-l'icona Liquid Glass, se c'è.
+l'icona Liquid Glass, se c'è. `--recursive` scarica anche Sguardo, il sistema di design comune
+(github.com/GGuidotz/sguardo) in `Vendor/Sguardo`; se hai già clonato senza, esegui `git submodule update --init`.
 
 ```sh
-git clone https://github.com/GGuidotz/typewithme.git
+git clone --recursive https://github.com/GGuidotz/typewithme.git
 cd typewithme
 ./build.sh              # compila TypeWithMe.app
 ./build.sh --install    # compila e copia in Applicazioni

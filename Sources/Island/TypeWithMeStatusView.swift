@@ -47,6 +47,8 @@ struct TypeWithMeStatusLabels {
 struct TypeWithMeStatusView: View {
     var info: TypeWithMeStatusInfo
     var labels = TypeWithMeStatusLabels()
+    /// Con il suo fondo (come nell'isola). Falso dentro un gruppo di righe, che ha già la sua superficie.
+    var framed = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -60,7 +62,9 @@ struct TypeWithMeStatusView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background {
+            if framed { RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.primary.opacity(0.05)) }
+        }
         .accessibilityElement(children: .combine)
     }
 

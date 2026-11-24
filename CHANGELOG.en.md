@@ -3,6 +3,18 @@
 English notes, same format as CHANGELOG.md (the Italian one is the reference). The app uses these when its language
 is English; versions missing here fall back to the Italian notes.
 
+## 0.5.7 · 2026-11-24
+
+A new look: the shapes, colors and motion of Sguardo, the design system shared by our apps, and an accent color of your choice.
+
+### New features
+- **Accent color of your choice.** In Settings › General: the Type_w/Me cursor blue, the macOS accent color, or your own.
+
+### Improvements
+- **Redesigned settings.** Rows on a translucent layer with a thin outline, capsule menus and fields, short notes under each group. The tab bar floats at the bottom and shows the name of the selected tab; ⌘1 to ⌘7 work as before.
+- **First-run guide, What's New and panels in the same style.** Capsule buttons, guide steps that change with a soft blur, and Rewrite, Synonyms and Proofread with the same controls. Glass stays only on the tab bar.
+- **Builds from a clone.** Sguardo comes with `git clone --recursive`: building from source has everything it needs.
+
 ## 0.5.6 · 2026-11-17
 
 More protection for what you write.

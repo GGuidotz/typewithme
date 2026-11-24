@@ -89,10 +89,10 @@ enum AboutPanel {
 struct DeveloperLinks: View {
     var body: some View {
         HStack(spacing: 14) {
-            Text(L("Sviluppato da %@", Developer.name)).foregroundStyle(.secondary)
+            Text(L("Sviluppato da %@", Developer.name)).foregroundStyle(SG.Ink.secondary)
             Link(destination: Developer.github) { Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right") }
             Link(destination: URL(string: "mailto:\(Developer.email)")!) { Label(Developer.email, systemImage: "envelope") }
         }
-        .font(.callout)
+        .font(SG.Font.field)
     }
 }

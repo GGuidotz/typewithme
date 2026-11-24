@@ -91,7 +91,7 @@ struct WhatsNewView: View {
                     ForEach(entries) { entry in
                         if entries.count > 1 {
                             Text(L("Versione %@", entry.version))
-                                .font(.title3.weight(.semibold))
+                                .font(SG.Font.instruction)
                         }
                         ForEach(entry.sections) { section in
                             SectionBlock(section: section)
@@ -105,18 +105,18 @@ struct WhatsNewView: View {
             Divider()
             HStack {
                 Text(L("Le note complete sono in Impostazioni › Aggiornamenti."))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(SG.Font.caption)
+                    .foregroundStyle(SG.Ink.secondary)
                 Spacer()
                 Button(L("Continua"), action: close)
-                    .glassProminentButton()
-                    .controlSize(.large)
+                    .buttonStyle(SGCapsuleButtonStyle(.primary, size: .large))
                     .keyboardShortcut(.defaultAction)
             }
             .padding(.horizontal, 32)
             .padding(.vertical, 16)
         }
         .frame(width: Self.size.width, height: Self.size.height)
+        .sguardoAccent(default: .typewithme)
     }
 
     private var header: some View {
@@ -127,15 +127,14 @@ struct WhatsNewView: View {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
                 Text(L("Novità"))
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(SG.Font.bodyEmphasis)
+                    .foregroundStyle(SG.Ink.secondary)
                 Text(verbatim: "\(AppInfo.name) \(entries.first?.version ?? "")")
-                    .font(.largeTitle.weight(.semibold))
-                    .fontDesign(.rounded)
+                    .font(SG.Font.title)
                 if let summary = entries.first?.summary, !summary.isEmpty {
                     Text(summary)
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
+                        .font(SG.Font.instruction)
+                        .foregroundStyle(SG.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -148,6 +147,7 @@ struct WhatsNewView: View {
 /// Un gruppo (New features, Improvements, Bug fixes): intestazione con simbolo e conteggio, poi le voci.
 private struct SectionBlock: View {
     let section: ChangelogSection
+    @Environment(\.sgAccent) private var accent
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -155,27 +155,26 @@ private struct SectionBlock: View {
                 Image(systemName: section.symbol)
                     .foregroundStyle(tint)
                     .accessibilityHidden(true)
-                Text(Self.executiveTitle(section.title).uppercased())
-                    .font(.caption.weight(.bold))
-                    .tracking(0.8)
+                Text(Self.executiveTitle(section.title))
+                    .font(SG.Font.bodyEmphasis)
                 Text("\(section.items.count)")
-                    .font(.caption.weight(.semibold))
+                    .font(SG.Font.label)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
+                    .foregroundStyle(SG.Ink.secondary)
+                    .padding(.horizontal, 7)
                     .padding(.vertical, 1)
-                    .background(Color.primary.opacity(0.08), in: Capsule())
+                    .background(SG.Fill.neutralButton, in: Capsule())
                     .accessibilityLabel(L("%d voci", section.items.count))
             }
             ForEach(section.items, id: \.self) { item in
                 let parts = Self.split(item)
                 VStack(alignment: .leading, spacing: 2) {
                     if let title = parts.title {
-                        Text(title).font(.body.weight(.semibold))
+                        Text(title).font(SG.Font.bodyEmphasis).foregroundStyle(SG.Ink.primary)
                     }
                     Text((try? AttributedString(markdown: parts.detail)) ?? AttributedString(parts.detail))
-                        .font(parts.title == nil ? .body : .callout)
-                        .foregroundStyle(parts.title == nil ? Color.primary : Color.secondary)
+                        .font(parts.title == nil ? SG.Font.body : SG.Font.field)
+                        .foregroundStyle(parts.title == nil ? SG.Ink.primary : SG.Ink.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(.leading, 26)
@@ -190,7 +189,7 @@ private struct SectionBlock: View {
         case "novità", "new features": Palette.calm
         case "correzioni", "bug fixes": .orange
         case "sicurezza", "security": .red
-        default: .accentColor
+        default: accent.base
         }
     }
 

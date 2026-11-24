@@ -12,7 +12,7 @@ struct EngineSettings: View {
     @ObservedObject var llama: LlamaServer
 
     var body: some View {
-        Form {
+        SGPage {
             EngineChoiceSection(prefs: prefs, completer: completer)
             GemmaServerSection(prefs: prefs, llama: llama)
             GemmaModelSection(prefs: prefs, llama: llama)
@@ -34,16 +34,19 @@ private struct EngineChoiceSection: View {
     @ObservedObject var completer: Completer
 
     var body: some View {
-        Section {
-            Picker(L("Motore"), selection: $prefs.engine) {
-                ForEach(EngineChoice.allCases) { Text($0.title).tag($0) }
+        SGSection(L("Motore")) {
+            SGMenuRow(L("Motore"), selection: $prefs.engine,
+                      options: EngineChoice.allCases.map { (value: $0, title: $0.title) })
+            SGDivider()
+            SGValueRow(L("In uso adesso")) {
+                Text(completer.currentEngineName ?? L("Solo regole e memoria"))
             }
-            LabeledContent(L("In uso adesso"), value: completer.currentEngineName ?? L("Solo regole e memoria"))
-            if let notice = completer.engineNotice { Footnote(notice) }
-        } header: {
-            Text(L("Motore"))
+            if let notice = completer.engineNotice {
+                SGDivider()
+                SGRowBlock { SGFootnote(notice) }
+            }
         } footer: {
-            Footnote(L("Consigliato: Automatico. Usa Gemma quando c'è llama.cpp (o Ollama con il modello), altrimenti Apple Intelligence; mentre Gemma si avvia risponde Apple Intelligence. Con \"Solo regole e memoria\" nessun modello viene chiamato: restano correzioni, abbreviazioni, formule fisse e le frasi che hai accettato."))
+            SGFootnote(L("Consigliato: Automatico. Usa Gemma quando c'è llama.cpp (o Ollama con il modello), altrimenti Apple Intelligence; mentre Gemma si avvia risponde Apple Intelligence. Con \"Solo regole e memoria\" nessun modello viene chiamato: restano correzioni, abbreviazioni, formule fisse e le frasi che hai accettato."))
         }
     }
 }
@@ -55,44 +58,63 @@ private struct GemmaServerSection: View {
     @ObservedObject var llama: LlamaServer
 
     var body: some View {
-        Section {
-            LabeledContent {
+        SGSection("Gemma (llama.cpp)") {
+            SGLabeledRow {
+                Text(verbatim: "llama.cpp")
+            } trailing: {
                 StateLabel(ok: llama.isInstalled, text: !llama.isInstalled ? L("Non installato")
                            : LlamaServer.bundledTag.map { L("Incluso nell'app (%@)", $0) } ?? L("Installato"))
-            } label: {
-                Text(verbatim: "llama.cpp")
             }
             if !llama.isInstalled {
-                LlamaInstallBox()
+                SGDivider()
+                SGRowBlock { LlamaInstallBox() }
             }
-            LabeledContent(L("Server")) {
+            SGDivider()
+            SGLabeledRow {
+                Text(L("Server"))
+            } trailing: {
                 Text(serverText)
+                    .foregroundStyle(SG.Ink.secondary)
                     .multilineTextAlignment(.trailing)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 360, alignment: .trailing)
             }
-            HStack {
-                if llama.state == .stopped || llama.state.isFailed {
-                    Button(L("Avvia ora")) { llama.start() }
-                        .disabled(!llama.isInstalled && !llama.ollamaRunning)
-                } else {
-                    Button(L("Ferma")) { llama.stop() }
-                }
-                if llama.state.isBusy { ProgressView().controlSize(.small) }
-            }
-            Toggle(L("Usa Ollama se è aperto"), isOn: $prefs.useOllama)
-            Toggle(L("Tieni il modello pronto"), isOn: $prefs.keepModelLoaded)
-            if !prefs.keepModelLoaded || prefs.batterySaver {
-                LabeledContent(L("Spegni dopo")) {
-                    Stepper(value: $prefs.llamaIdleMinutes, in: 1...120, step: 1) {
-                        Text(L("%d minuti senza richieste", Int(prefs.llamaIdleMinutes))).monospacedDigit()
+            SGDivider()
+            SGRowBlock {
+                HStack(spacing: 10) {
+                    if llama.state == .stopped || llama.state.isFailed {
+                        Button(L("Avvia ora")) { llama.start() }
+                            .buttonStyle(.sgSecondary)
+                            .disabled(!llama.isInstalled && !llama.ollamaRunning)
+                    } else {
+                        Button(L("Ferma")) { llama.stop() }
+                            .buttonStyle(.sgSecondary)
                     }
+                    if llama.state.isBusy { ProgressView().controlSize(.small) }
                 }
             }
+            SGDivider()
+            SGToggleRow(L("Usa Ollama se è aperto"), isOn: $prefs.useOllama)
+            SGDivider()
+            SGToggleRow(L("Tieni il modello pronto"), isOn: $prefs.keepModelLoaded)
+            if !prefs.keepModelLoaded || prefs.batterySaver {
+                SGDivider()
+                SGLabeledRow {
+                    Text(L("Spegni dopo"))
+                } trailing: {
+                    Stepper(value: $prefs.llamaIdleMinutes, in: 1...120, step: 1) {
+                        Text(L("%d minuti senza richieste", Int(prefs.llamaIdleMinutes)))
+                            .font(SG.Font.body)
+                            .foregroundStyle(SG.Ink.secondary)
+                            .monospacedDigit()
+                    }
+                    .controlSize(.small)
+                }
+            }
+            SGDivider()
             ServerPathField(prefs: prefs)
-        } header: {
-            Text(verbatim: "Gemma (llama.cpp)")
         } footer: {
-            Footnote(L("Il server gira solo sul Mac (127.0.0.1). Con \"Tieni il modello pronto\" parte con l'app e resta caricato (circa 1 GB di memoria con Gemma 3 1B), così il primo suggerimento dopo una pausa arriva subito; altrimenti parte alla prima richiesta e si spegne dopo i minuti scelti. La prima volta scarica il modello nella cache di llama.cpp. Se Ollama è aperto e ha già il modello, si usa quello."))
+            SGFootnote(L("Il server gira solo sul Mac (127.0.0.1). Con \"Tieni il modello pronto\" parte con l'app e resta caricato (circa 1 GB di memoria con Gemma 3 1B), così il primo suggerimento dopo una pausa arriva subito; altrimenti parte alla prima richiesta e si spegne dopo i minuti scelti. La prima volta scarica il modello nella cache di llama.cpp. Se Ollama è aperto e ha già il modello, si usa quello."))
         }
     }
 
@@ -115,10 +137,17 @@ private struct ServerPathField: View {
     @State private var draft = ""
 
     var body: some View {
-        TextField(text: $draft, prompt: Text(L("Vuoto: lo cerca in /opt/homebrew/bin e /usr/local/bin"))) {
+        SGLabeledRow {
             Text(L("Percorso di llama-server"))
+        } trailing: {
+            TextField(text: $draft, prompt: Text(L("Vuoto: lo cerca in /opt/homebrew/bin e /usr/local/bin"))) {
+                Text(L("Percorso di llama-server"))
+            }
+            .labelsHidden()
+            .sgField()
+            .frame(width: 320)
+            .onSubmit { commit() }
         }
-        .onSubmit { commit() }
         .onAppear { draft = prefs.llamaServerPath ?? "" }
         .onDisappear { commit() }
     }
@@ -135,43 +164,44 @@ private struct GemmaModelSection: View {
     @ObservedObject var llama: LlamaServer
 
     var body: some View {
-        Section {
-            Picker(L("Modello"), selection: $prefs.selectedModelID) {
-                ForEach(ModelCatalog.all(custom: prefs.customModels)) { entry in
-                    Text(title(for: entry)).tag(entry.id)
-                }
-            }
+        SGSection(L("Modello di Gemma")) {
+            SGMenuRow(L("Modello"), selection: $prefs.selectedModelID,
+                      options: ModelCatalog.all(custom: prefs.customModels).map { (value: $0.id, title: title(for: $0)) })
             let entry = prefs.selectedModel
             if entry.isLocalFile {
-                LabeledContent(L("File"), value: L("già sul Mac, nella cartella di Cotypist"))
+                SGDivider()
+                SGValueRow(L("File")) { Text(L("già sul Mac, nella cartella di Cotypist")) }
             }
             if entry.usesRawCompletion {
-                Footnote(L("Modello base: continua il testo così com'è, in modo naturale, ma non segue le istruzioni (tono, per app) e non riscrive la selezione: per quello si usa Apple Intelligence."))
+                SGDivider()
+                SGRowBlock {
+                    SGFootnote(L("Modello base: continua il testo così com'è, in modo naturale, ma non segue le istruzioni (tono, per app) e non riscrive la selezione: per quello si usa Apple Intelligence."))
+                }
             }
             if let repo = entry.hfRepo {
-                LabeledContent {
-                    Text(repo).textSelection(.enabled)
-                } label: {
+                SGDivider()
+                SGLabeledRow {
                     Text(verbatim: "Hugging Face")
+                } trailing: {
+                    Text(repo).foregroundStyle(SG.Ink.secondary).textSelection(.enabled)
                 }
             }
             if let name = entry.ollamaName {
-                LabeledContent {
-                    HStack(spacing: 6) {
-                        Text(name).textSelection(.enabled)
+                SGDivider()
+                SGLabeledRow {
+                    Text(verbatim: "Ollama")
+                } trailing: {
+                    HStack(spacing: 10) {
+                        Text(name).foregroundStyle(SG.Ink.secondary).textSelection(.enabled)
                         if llama.ollamaRunning {
                             StateLabel(ok: llama.ollamaHas(entry),
                                        text: llama.ollamaHas(entry) ? L("scaricato in Ollama") : L("non c'è in Ollama"))
                         }
                     }
-                } label: {
-                    Text(verbatim: "Ollama")
                 }
             }
-        } header: {
-            Text(L("Modello di Gemma"))
         } footer: {
-            Footnote(L("Più grande è il modello, più è preciso e più è lento: per i suggerimenti mentre scrivi basta il 1B. Con Ollama il modello va scaricato prima: ollama pull seguito dal nome."))
+            SGFootnote(L("Più grande è il modello, più è preciso e più è lento: per i suggerimenti mentre scrivi basta il 1B. Con Ollama il modello va scaricato prima: ollama pull seguito dal nome."))
         }
     }
 
@@ -188,31 +218,48 @@ private struct CustomModelsSection: View {
     @State private var ollama = ""
 
     var body: some View {
-        Section {
+        SGSection(L("Altri modelli")) {
             ForEach(prefs.customModels) { entry in
-                HStack {
+                SGLabeledRow {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(entry.title)
-                        Text(detail(for: entry)).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        Text(detail(for: entry)).font(SG.Font.caption).foregroundStyle(SG.Ink.secondary).lineLimit(1)
                     }
-                    Spacer()
+                } trailing: {
                     Button { remove(entry) } label: { Image(systemName: "minus.circle") }
                         .buttonStyle(.borderless)
+                        .foregroundStyle(SG.Ink.secondary)
                         .accessibilityLabel(L("Togli %@", entry.title))
                 }
+                SGDivider()
             }
-            TextField(text: $title, prompt: Text(L("Per esempio: Gemma 3 1B veloce"))) { Text(L("Nome")) }
-            TextField(text: $repo, prompt: Text(L("Per esempio: ggml-org/gemma-3-1b-it-GGUF"))) { Text(L("Repository Hugging Face")) }
-            TextField(text: $ollama, prompt: Text(L("Per esempio: gemma3:1b"))) { Text(L("Nome in Ollama")) }
-            HStack {
-                Spacer()
-                Button(L("Aggiungi il modello")) { add() }
-                    .disabled(ModelCatalog.custom(title: title, hfRepo: repo, ollamaName: ollama) == nil)
+            field(L("Nome"), prompt: L("Per esempio: Gemma 3 1B veloce"), text: $title)
+            SGDivider()
+            field(L("Repository Hugging Face"), prompt: L("Per esempio: ggml-org/gemma-3-1b-it-GGUF"), text: $repo)
+            SGDivider()
+            field(L("Nome in Ollama"), prompt: L("Per esempio: gemma3:1b"), text: $ollama)
+            SGDivider()
+            SGRowBlock {
+                HStack {
+                    Spacer()
+                    Button(L("Aggiungi il modello")) { add() }
+                        .buttonStyle(.sgSecondary)
+                        .disabled(ModelCatalog.custom(title: title, hfRepo: repo, ollamaName: ollama) == nil)
+                }
             }
-        } header: {
-            Text(L("Altri modelli"))
         } footer: {
-            Footnote(L("Basta uno dei due: il repository per llama.cpp o il nome per Ollama. Il modello nuovo diventa quello scelto."))
+            SGFootnote(L("Basta uno dei due: il repository per llama.cpp o il nome per Ollama. Il modello nuovo diventa quello scelto."))
+        }
+    }
+
+    private func field(_ label: String, prompt: String, text: Binding<String>) -> some View {
+        SGLabeledRow {
+            Text(label)
+        } trailing: {
+            TextField(text: text, prompt: Text(prompt)) { Text(label) }
+                .labelsHidden()
+                .sgField()
+                .frame(width: 320)
         }
     }
 
@@ -244,15 +291,16 @@ private struct AppleIntelligenceSection: View {
     @ObservedObject var completer: Completer
 
     var body: some View {
-        Section {
-            AppleStatusLabel(readyText: L("Apple Intelligence è pronta: il modello gira sul Mac, niente rete."))
-            if let error = completer.lastError {
-                Footnote(L("Ultimo errore del modello: %@", error))
+        SGSection(L("Apple Intelligence")) {
+            SGRowBlock {
+                AppleStatusLabel(readyText: L("Apple Intelligence è pronta: il modello gira sul Mac, niente rete."))
             }
-        } header: {
-            Text(L("Apple Intelligence"))
+            if let error = completer.lastError {
+                SGDivider()
+                SGRowBlock { SGFootnote(L("Ultimo errore del modello: %@", error)) }
+            }
         } footer: {
-            Footnote(L("Già sul Mac, senza installare niente, ma più debole e più lenta di Gemma. Legge solo gli ultimi 700 caratteri prima del cursore."))
+            SGFootnote(L("Già sul Mac, senza installare niente, ma più debole e più lenta di Gemma. Legge solo gli ultimi 700 caratteri prima del cursore."))
         }
     }
 }
@@ -262,14 +310,14 @@ struct InstructionsSection: View {
     @ObservedObject var prefs: Preferences
 
     var body: some View {
-        Section {
-            TextField(L("Per esempio: tono informale, frasi corte, niente anglicismi"), text: $prefs.instructions, axis: .vertical)
-                .lineLimit(2...5)
-                .textFieldStyle(.roundedBorder)
-        } header: {
-            Text(L("Le tue istruzioni"))
+        SGSection(L("Le tue istruzioni")) {
+            SGRowBlock {
+                TextField(L("Per esempio: tono informale, frasi corte, niente anglicismi"), text: $prefs.instructions, axis: .vertical)
+                    .lineLimit(2...5)
+                        .sgField(multiline: true)
+            }
         } footer: {
-            Footnote(L("Una frase che vale per tutti i suggerimenti, con qualunque motore. Il modello la legge insieme al testo: tienila corta e concreta. Non scriverci dati personali: restano sul Mac, ma non servono. Per una frase che vale solo in un'app: Impostazioni › App."))
+            SGFootnote(L("Una frase che vale per tutti i suggerimenti, con qualunque motore. Il modello la legge insieme al testo: tienila corta e concreta. Non scriverci dati personali: restano sul Mac, ma non servono. Per una frase che vale solo in un'app: Impostazioni › App."))
         }
     }
 }
@@ -283,7 +331,7 @@ struct StateLabel: View {
 
     var body: some View {
         Label {
-            Text(text)
+            Text(text).font(SG.Font.body).foregroundStyle(SG.Ink.primary)
         } icon: {
             Image(systemName: ok ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                 .foregroundStyle(ok ? Palette.calm : Color.orange)
@@ -303,7 +351,8 @@ struct AppleStatusLabel: View {
             Image(systemName: reason == nil ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                 .foregroundStyle(reason == nil ? Palette.calm : Color.orange)
         }
-        .font(.callout)
+        .font(SG.Font.body)
+        .foregroundStyle(SG.Ink.primary)
     }
 }
 
@@ -316,22 +365,23 @@ struct LlamaInstallBox: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if Homebrew.isInstalled {
-                Text(L("Per installare llama.cpp, esegui nel Terminale:")).foregroundStyle(.secondary)
+                Text(L("Per installare llama.cpp, esegui nel Terminale:")).foregroundStyle(SG.Ink.secondary)
                 Text(Homebrew.installLlamaCommand)
-                    .font(.system(.callout, design: .monospaced))
+                    .font(.system(size: 12, design: .monospaced))
                     .textSelection(.enabled)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.secondary.opacity(0.12)))
-                HStack {
+                    .background(SG.Fill.tile, in: RoundedRectangle(cornerRadius: SG.Radius.tile, style: .continuous))
+                HStack(spacing: 8) {
                     Button(copied ? L("Copiato") : L("Copia comando")) {
                         Terminal.copy(Homebrew.installLlamaCommand)
                         copied = true
                     }
+                    .buttonStyle(.sgSecondary)
                     Button(L("Installa nel Terminale")) {
                         error = Terminal.run(command: Homebrew.installLlamaCommand)
                     }
-                    .glassProminentButton()
+                    .buttonStyle(.sgPrimary)
                 }
                 if let error {
                     Text(error).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
@@ -346,5 +396,6 @@ struct LlamaInstallBox: View {
                 Link(destination: Homebrew.website) { Text(verbatim: "brew.sh") }
             }
         }
+        .font(SG.Font.body)
     }
 }

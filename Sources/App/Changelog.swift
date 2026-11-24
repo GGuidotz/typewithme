@@ -108,21 +108,22 @@ struct ChangelogList: View {
             ForEach(entries) { entry in
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Text(L("Versione %@", entry.version)).font(.headline)
-                        Text(entry.date).font(.callout).foregroundStyle(.secondary)
+                        Text(L("Versione %@", entry.version)).font(SG.Font.bodyEmphasis).foregroundStyle(SG.Ink.primary)
+                        Text(entry.date).font(SG.Font.caption).foregroundStyle(SG.Ink.secondary)
                     }
                     ForEach(entry.sections) { section in
                         VStack(alignment: .leading, spacing: 5) {
                             Label(section.title, systemImage: section.symbol)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(Palette.calm)
+                                .font(SG.Font.label)
+                                .foregroundStyle(SG.Ink.secondary)
                             ForEach(section.items, id: \.self) { item in
                                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                    Text("•").foregroundStyle(.secondary).accessibilityHidden(true)
+                                    Text("•").foregroundStyle(SG.Ink.tertiary).accessibilityHidden(true)
                                     Text((try? AttributedString(markdown: item)) ?? AttributedString(item))
                                         .fixedSize(horizontal: false, vertical: true)
                                 }
-                                .font(.callout)
+                                .font(SG.Font.field)
+                                .foregroundStyle(SG.Ink.primary)
                             }
                         }
                     }

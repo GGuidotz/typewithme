@@ -30,8 +30,18 @@ app: testo grigio dopo il cursore, Tab per accettare. Tutto sul Mac. Stesso sche
   versione inglese in `CHANGELOG.en.md`.
 - Design: Human Interface Guidelines; minimal; colore mai come unico segnale; cifre tabellari; niente emoji, né
   nell'interfaccia né nei suggerimenti.
-- Avvio AppKit (`Sources/App/Main.swift`), NSStatusItem disegnato da noi, impostazioni in una finestra nostra.
-  Liquid Glass solo sui controlli che galleggiano (`Sources/App/Style.swift`).
+- Grafica: Sguardo, il sistema di design comune (github.com/GGuidotz/sguardo, submodule in `Vendor/Sguardo`, regole in
+  DESIGN.md e PLAYBOOK.md), compilato insieme all'app da build.sh (`SGUARDO_DIR` per provare il kit locale). Accento
+  predefinito `SG.Accent.typewithme` (il blu del cursore, `Palette.cursor`), applicato a ogni radice con
+  `.sguardoAccent(default:)`: in Generale la persona sceglie colore dell'app, di sistema o personalizzato
+  (`SGAccentRow`). Impostazioni con `SGPage`/`SGSection`/`SGToggleRow`/`SGMenuRow`, schede e righe fuori dalle
+  impostazioni con `contentCard`, campi con `sgField()` (Style.swift: Sguardo ha il campo solo per l'isola), pulsanti nel
+  contenuto `.buttonStyle(.sgSecondary/.sgPrimary/.sgDestructive)`. Liquid Glass solo sui controlli che galleggiano
+  (barra delle schede `SGFloatingTabBar`; `floatingGlassButton` per le barre in fondo), sempre dietro
+  `if #available(macOS 26, *)`. `Sources/Island` resta senza Sguardo (si riusa nell'isola di Cocaine): se un giorno lo
+  usa, Cocaine deve compilare anche i sorgenti di Sguardo.
+- Avvio AppKit (`Sources/App/Main.swift`), NSStatusItem disegnato da noi, impostazioni in una finestra nostra
+  (`Sources/App/SettingsWindow.swift`, barra del titolo trasparente, `.ignoresSafeArea()` sulla radice).
 - Leggerezza: a tastiera ferma l'app non fa nulla; una richiesta al modello solo dopo una pausa, annullata se riprendi a
   scrivere; niente letture del campo a ogni tasto oltre a quelle necessarie.
 - Repository pubblico: mai dati reali nei testi, negli esempi o nei test (esempi inventati: Marta, Luca, Nexa, Studio Rossi).

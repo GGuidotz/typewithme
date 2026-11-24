@@ -154,25 +154,25 @@ final class RewriteController: NSObject, ObservableObject, NSWindowDelegate {
 }
 
 struct RewriteView: View {
-    static let size = CGSize(width: 460, height: 380)
+    static let size = CGSize(width: 540, height: 380)
 
     @ObservedObject var controller: RewriteController
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(L("Riscrivi la selezione"))
-                .font(.headline)
+                .font(SG.Font.instruction)
                 .padding(.top, 6)
             if controller.original.isEmpty {
                 Text(L("Seleziona del testo in un'app, poi premi di nuovo %@.", controller.prefs.rewrite.display))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(SG.Ink.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer()
             } else {
                 ScrollView {
                     Text(controller.original)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .font(SG.Font.field)
+                        .foregroundStyle(SG.Ink.secondary)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -180,16 +180,16 @@ struct RewriteView: View {
                 .contentCard(padding: 8)
                 HStack(spacing: 6) {
                     ForEach(RewritePreset.allCases) { preset in
-                        Button { controller.run(preset) } label: { Label(preset.title, systemImage: preset.symbol) }
-                            .glassButton()
+                        Button { controller.run(preset) } label: { Label(preset.title, systemImage: preset.symbol).lineLimit(1).fixedSize() }
+                            .buttonStyle(.sgSecondary)
                     }
                 }
-                .controlSize(.small)
                 HStack {
                     TextField(L("Oppure dì tu cosa fare, per esempio: traduci in inglese"), text: $controller.instruction)
-                        .textFieldStyle(.roundedBorder)
+                        .sgField()
                         .onSubmit { controller.runCustom() }
                     Button(L("Vai")) { controller.runCustom() }
+                        .buttonStyle(.sgSecondary)
                         .disabled(controller.instruction.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 resultArea
@@ -197,30 +197,32 @@ struct RewriteView: View {
             }
             HStack {
                 Button(L("Copia")) { controller.copyResult() }
+                    .buttonStyle(.sgSecondary)
                     .disabled(controller.result == nil)
                 Spacer()
                 Button(L("Chiudi")) { controller.closePanel() }
-                    .glassButton()
+                    .buttonStyle(.sgSecondary)
                     .keyboardShortcut(.cancelAction)
                 Button(L("Sostituisci")) { controller.replace() }
-                    .glassProminentButton()
+                    .buttonStyle(.sgPrimary)
                     .keyboardShortcut(.defaultAction)
                     .disabled(controller.result == nil)
             }
         }
         .padding(16)
         .frame(width: Self.size.width, height: Self.size.height)
+        .sguardoAccent(default: .typewithme)
     }
 
     @ViewBuilder
     private var resultArea: some View {
         switch controller.state {
         case .idle:
-            Text(L("Scegli come riscrivere.")).foregroundStyle(.secondary)
+            Text(L("Scegli come riscrivere.")).foregroundStyle(SG.Ink.secondary)
         case .working:
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text(L("Sto riscrivendo…")).foregroundStyle(.secondary)
+                Text(L("Sto riscrivendo…")).foregroundStyle(SG.Ink.secondary)
             }
         case .done(let text):
             ScrollView {

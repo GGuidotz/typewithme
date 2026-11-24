@@ -15,6 +15,9 @@ A new look: the shapes, colors and motion of Sguardo, the design system shared b
 - **First-run guide, What's New and panels in the same style.** Capsule buttons, guide steps that change with a soft blur, and Rewrite, Synonyms and Proofread with the same controls. Glass stays only on the tab bar.
 - **Builds from a clone.** Sguardo comes with `git clone --recursive`: building from source has everything it needs.
 
+### Bug Fixes
+- **Opens again.** Version 0.5.6 quit at launch: macOS refused the Gemma library bundled with the app. It now loads it, and the app stays protected against code injection.
+
 ## 0.5.6 · 2026-11-17
 
 More protection for what you write.

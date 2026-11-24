@@ -5,5 +5,10 @@
 	<!-- NSAppleScript (Terminal.swift) apre il Terminale per il comando di aggiornamento. -->
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>
+	<!-- Gemma dentro l'app: l'eseguibile carica Helpers/llama/libllama*.dylib. Con l'hardened runtime macOS accetta solo
+	     librerie dello stesso Team ID, e la firma locale ("Nod Local Signing") o ad hoc non ne ha: senza questa eccezione
+	     l'app si chiude all'avvio ("Library missing"). L'hardened runtime resta: DYLD_INSERT_LIBRARIES è ignorato. -->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
 </dict>
 </plist>

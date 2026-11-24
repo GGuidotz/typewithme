@@ -15,6 +15,9 @@ Una veste nuova: forme, colori e movimenti di Sguardo, il sistema di design comu
 - **Guida, novità e pannelli nello stesso stile.** Pulsanti a capsula, passaggi della guida con una dissolvenza sfocata, Riscrivi, Sinonimi e Correggi con gli stessi controlli. Il vetro resta solo sulla barra delle schede.
 - **Si compila da un clone.** Sguardo arriva con `git clone --recursive`: chi compila dal codice ha tutto.
 
+### Correzioni
+- **Si apre di nuovo.** La 0.5.6 si chiudeva all'avvio: macOS rifiutava la libreria di Gemma inclusa nell'app. Ora la carica, e l'app resta protetta dall'iniezione di codice.
+
 ## 0.5.6 · 2026-11-17
 
 Più protezioni per quello che scrivi.
